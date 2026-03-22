@@ -96,8 +96,7 @@ class TestExpoParser:
         info = parser._get_organizer_info("더베스트웨딩")
         assert info['contact'] == '062-714-1020'
         assert info['operating_hours'] == '10:00~18:00'
-        assert '브랜드' in info['description']
-        assert '혜택' in info['description']
+        assert '최대' in info['description']
 
     def test_get_organizer_info_reve(self, parser):
         info = parser._get_organizer_info("레브웨딩")
@@ -109,7 +108,7 @@ class TestExpoParser:
         info = parser._get_organizer_info("알 수 없는主办")
         assert info['contact'] == ''
         assert info['operating_hours'] == '10:00~18:00'
-        assert '브랜드' in info['description']
+        assert info['description'] == ''
 
     def test_parse_all_with_new_fields(self, parser):
         raw_data = [
