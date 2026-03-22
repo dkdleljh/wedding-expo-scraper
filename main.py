@@ -100,6 +100,16 @@ def main():
             else:
                 logger.info("       ⏭️ 변경 없음")
         
+        # 4.5 자동 릴리즈 (매주 한 번 또는 데이터 크게 변경 시)
+        try:
+            from scripts.auto_release import AutoRelease
+            auto_release = AutoRelease()
+            # 월요일마다 또는 데이터 5건 이상 변경 시
+            if datetime.now().weekday() == 0 or len(parsed_data) >= 5:
+                auto_release.run(create_release=False)
+        except Exception as e:
+            logger.warning(f"       ⚠️ 자동 릴리즈 건너뜀: {e}")
+        
         # 5. 알림 전송
         logger.info("[5/6] 🔔 알림 전송...")
         notifier = NotificationService()
