@@ -314,13 +314,11 @@ class ExpoParser:
                     'name': name,
                     'start_date': start_date,
                     'end_date': end_date,
+                    'operating_hours': organizer_info['operating_hours'],
                     'location': location,
                     'organizer': organizer,
-                    'source_url': item.get('source_url', ''),
-                    'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'region': item.get('region', '기타'),
-                    'operating_hours': organizer_info['operating_hours'],
                     'contact': organizer_info['contact'],
+                    'source_url': item.get('source_url', ''),
                     'description': organizer_info['description']
                 })
                 

@@ -113,7 +113,7 @@ class TestExpoParser:
     def test_parse_all_with_new_fields(self, parser):
         raw_data = [
             {"name": "테스트 박람회", "start_date": "2026-03-28", "end_date": "2026-03-29", 
-             "location": "광주", "organizer": "더베스트웨딩", "source_url": "https://test.com", "region": "광주"},
+             "location": "광주", "organizer": "더베스트웨딩", "source_url": "https://test.com"},
         ]
         result = parser.parse_all(raw_data)
         assert len(result) == 1

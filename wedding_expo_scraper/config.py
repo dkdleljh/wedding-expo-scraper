@@ -132,8 +132,7 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 CSV_COLUMNS = [
     "name", "start_date", "end_date", "operating_hours",
     "location", "organizer", "contact",
-    "source_url", "description",
-    "scraped_at", "region"
+    "source_url", "description"
 ]
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
