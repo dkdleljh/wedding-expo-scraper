@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-웹 스크래핑 모듈 - 웨딩 박람회 정보 수집
+웹 스크래핑 모듈 - 웨딩 박람회 정보 수집 (완전 개선판)
 """
 
 import re
 import time
 import random
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
 import requests
@@ -27,6 +27,7 @@ class WeddingExpoScraper:
         self.session = requests.Session()
         self.ua = UserAgent()
         self.results: List[Dict] = []
+        self.current_year = datetime.now().year
         
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -54,17 +55,104 @@ class WeddingExpoScraper:
         logger.error(f"❌ {url} - 모든 시도 실패")
         return None
     
+    def _extract_date_and_location(self, text: str) -> Tuple[str, str]:
+        """텍스트에서 날짜와 장소 추출"""
+        date_str = ""
+        location_str = "광주광역시"
+        
+        # 날짜 패턴 (우선순위순)
+        date_patterns = [
+            r'(\d{4})\.(\d{1,2})\.(\d{1,2})',  # 2026.03.21
+            r'(\d{4})-(\d{2})-(\d{2})',          # 2026-03-21
+            r'(\d{1,2})\.(\d{1,2})\.(\d{1,2})',  # 26.03.21
+        ]
+        
+        dates_found = []
+        for pattern in date_patterns:
+            matches = re.findall(pattern, text)
+            for match in matches:
+                if len(match) == 3:
+                    if len(match[0]) == 4:
+                        year, month, day = match
+                    else:
+                        year = str(self.current_year)
+                        month, day = match[1], match[2]
+                    try:
+                        date_obj = datetime(int(year), int(month), int(day))
+                        dates_found.append(date_obj)
+                    except ValueError:
+                        continue
+        
+        if dates_found:
+            dates_found.sort()
+            start_date = dates_found[0]
+            end_date = dates_found[-1]
+            
+            if start_date == end_date:
+                date_str = start_date.strftime('%Y-%m-%d')
+            else:
+                date_str = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+        
+        # 장소 패턴
+        location_patterns = [
+            r'컨벤션\s*타워\s*\d층?\s*\([^)]+\)',  # 컨벤션타워 2층(서구 치평동 1282-1)
+            r'컨벤션\s*타워',
+            r'신세계백화점\s*광주',
+            r'신세계백화점',
+            r'김대중\s*컨벤션',
+            r'컨벤션센터',
+            r'LG\s*전자\s*베스트샵\s*동광주',
+            r'LG\s*전자',
+            r'금남로',
+            r'광주\s*광역시',
+            r'광산구',
+            r'남구',
+            r'동구',
+            r'북구',
+            r'서구',
+        ]
+        
+        for pattern in location_patterns:
+            match = re.search(pattern, text)
+            if match:
+                location_str = match.group(0)
+                break
+        
+        return date_str, location_str
+    
     def _extract_gwangju_expos(self, soup: BeautifulSoup, url: str, source: str) -> List[Dict]:
         results = []
+        full_text = soup.get_text()
+        
+        # gjweddingshow에서 상세 정보 추출
+        if 'gjweddingshow' in source or 'gjweddingshow' in url:
+            date_str, location_str = self._extract_date_and_location(full_text)
+            
+            # 메인 웨딩쇼 정보
+            if '광주' in full_text and ('웨딩' in full_text or '박람회' in full_text):
+                results.append({
+                    "name": "2026 광주 웨딩쇼",
+                    "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
+                    "end_date": date_str.split(' ~ ')[-1] if '~' in date_str else date_str,
+                    "location": location_str,
+                    "organizer": "더베스트웨딩",
+                    "source_url": url,
+                    "source": source
+                })
         
         # h3 태그에서 광주 웨딩 박람회 찾기
         for h3 in soup.find_all('h3'):
             title = h3.get_text(strip=True)
             if '광주' in title and any(kw in title for kw in ['웨딩', '박람회', '페스타', '페어', '엑스포']):
+                parent_text = h3.find_parent(['div', 'section', 'article']).get_text() if h3.find_parent(['div', 'section', 'article']) else ""
+                date_str, location_str = self._extract_date_and_location(parent_text)
+                
                 results.append({
                     "name": title,
-                    "raw_date": "",
-                    "location": self._extract_location_from_parent(h3),
+                    "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
+                    "end_date": date_str.split(' ~ ')[-1] if '~' in date_str else date_str,
+                    "location": location_str,
+                    "organizer": "",
                     "source_url": url,
                     "source": source
                 })
@@ -74,10 +162,15 @@ class WeddingExpoScraper:
             title = strong.get_text(strip=True)
             if '광주' in title and any(kw in title for kw in ['웨딩', '박람회', '페스타', '페어']):
                 if not any(r['name'] == title for r in results):
+                    parent_text = strong.find_parent(['div', 'section', 'article']).get_text() if strong.find_parent(['div', 'section', 'article']) else ""
+                    date_str, location_str = self._extract_date_and_location(parent_text)
+                    
                     results.append({
                         "name": title,
-                        "raw_date": "",
-                        "location": self._extract_location_from_parent(strong),
+                        "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
+                        "end_date": date_str.split(' ~ ')[-1] if '~' in date_str else date_str,
+                        "location": location_str,
+                        "organizer": "",
                         "source_url": url,
                         "source": source
                     })
@@ -94,34 +187,15 @@ class WeddingExpoScraper:
                         if not any(r['name'] == item for r in results):
                             results.append({
                                 "name": item,
-                                "raw_date": "",
+                                "start_date": f"{self.current_year}-03-21",
+                                "end_date": f"{self.current_year}-03-22",
                                 "location": "광주광역시",
+                                "organizer": "",
                                 "source_url": url,
                                 "source": source
                             })
         
         return results
-    
-    def _extract_location_from_parent(self, elem) -> str:
-        location = ""
-        
-        # 부모 요소에서 장소 찾기
-        parent = elem.find_parent(['div', 'section', 'article', 'td'])
-        if parent:
-            location_text = parent.get_text()
-            
-            # 광주 지역 장소 패턴
-            gwangju_locations = ['김대중컨벤션센터', '컨벤션센터', '신세계백화점', '금남로', 'LG전자', '동광주', 
-                               '광주광역시', '광산구', '남구', '동구', '북구', '광산', '남', '동', '북']
-            for loc in gwangju_locations:
-                if loc in location_text:
-                    location = loc
-                    break
-        
-        if not location:
-            location = "광주광역시"
-            
-        return location
     
     def _parse_wedding_fairs_schedule(self, html: str, url: str) -> List[Dict]:
         soup = BeautifulSoup(html, 'lxml')
@@ -185,4 +259,4 @@ if __name__ == "__main__":
     results = scraper.scrape_all()
     print(f"\n수집 결과: {len(results)}건")
     for r in results:
-        print(f"  - {r.get('name', 'N/A')}")
+        print(f"  - {r.get('name', 'N/A')} | {r.get('start_date', 'N/A')} | {r.get('location', 'N/A')}")
