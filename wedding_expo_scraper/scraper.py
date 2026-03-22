@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class WeddingExpoScraper:
-    """웨딩박람회 스크래핑 클래스"""
     
     def __init__(self):
         self.session = requests.Session()
@@ -29,7 +28,6 @@ class WeddingExpoScraper:
         self.results: List[Dict] = []
         
     def _get_headers(self) -> Dict[str, str]:
-        """요청 헤더 생성"""
         return {
             "User-Agent": self.ua.random,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -40,12 +38,10 @@ class WeddingExpoScraper:
         }
     
     def _respectful_delay(self):
-        """서버에 부담을 주지 않는 딜레이"""
         delay = random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX)
         time.sleep(delay)
     
     def _fetch_page(self, url: str) -> Optional[str]:
-        """웹페이지 가져오기 (재시도 포함)"""
         for attempt in range(REQUEST_RETRY_COUNT):
             try:
                 self._respectful_delay()
@@ -57,7 +53,6 @@ class WeddingExpoScraper:
                 )
                 response.raise_for_status()
                 
-                # 인코딩 처리
                 response.encoding = response.apparent_encoding or 'utf-8'
                 
                 logger.info(f"✅ {url} - 성공 (시도 {attempt + 1})")
@@ -74,12 +69,9 @@ class WeddingExpoScraper:
         return None
     
     def _parse_wedding_fairs_schedule(self, html: str, url: str) -> List[Dict]:
-        """weddingfairschedule.kr 파싱"""
         results = []
         soup = BeautifulSoup(html, 'lxml')
         
-        # 웨딩 박람회 항목 찾기
-        # 일반적인 선택자 시도
         selectors = [
             '.expo-item',
             '.wedding-item',
@@ -87,49 +79,55 @@ class WeddingExpoScraper:
             '.event-item',
             '.card',
             'article',
-            '.list-item'
+            '.list-item',
+            'div[class*="expo"]',
+            'div[class*="event"]',
+            'li[class*="item"]',
+            '.content',
+            'main'
         ]
         
         items = []
         for selector in selectors:
             items = soup.select(selector)
-            if items:
+            if items and len(items) > 1:
                 logger.info(f"🔍 선택자 '{selector}'로 {len(items)}개 항목 발견")
                 break
         
         for item in items:
             try:
-                # 제목 추출
-                title_elem = (item.select_one('h2, h3, h4, .title, .name') or 
+                text = item.get_text()
+                
+                if '광주' not in text:
+                    continue
+                
+                title_elem = (item.select_one('h1, h2, h3, h4, h5, a, .title, .name, strong') or
                              item.select_one('[class*="title"], [class*="name"]'))
                 title = title_elem.get_text(strip=True) if title_elem else ""
                 
-                # 날짜 추출
-                date_elem = (item.select_one('.date, .schedule, .period, time') or
-                            item.select_one('[class*="date"], [class*="schedule"]'))
+                if not title or len(title) < 2:
+                    continue
+                
+                date_elem = (item.select_one('.date, .schedule, .period, .time, time') or
+                            item.select_one('[class*="date"], [class*="schedule"], [class*="period"]'))
                 date_text = date_elem.get_text(strip=True) if date_elem else ""
                 
-                # 장소 추출
                 location_elem = (item.select_one('.location, .venue, .place') or
-                                item.select_one('[class*="location"], [class*="venue"]'))
+                                item.select_one('[class*="location"], [class*="venue"], [class*="place"]'))
                 location = location_elem.get_text(strip=True) if location_elem else ""
                 
-                # 링크 추출
                 link_elem = item.select_one('a[href]')
                 link = link_elem['href'] if link_elem else ""
                 if link and not link.startswith('http'):
                     link = f"https://weddingfairschedule.kr{link}"
                 
-                # 광주 관련 데이터만 필터링
-                if title and ('광주' in title or 'Gwangju' in title.upper() or
-                           '광주' in location or '광주' in date_text):
-                    results.append({
-                        "name": title,
-                        "raw_date": date_text,
-                        "location": location,
-                        "source_url": link,
-                        "source": "weddingfairschedule.kr"
-                    })
+                results.append({
+                    "name": title,
+                    "raw_date": date_text,
+                    "location": location,
+                    "source_url": link,
+                    "source": "weddingfairschedule.kr"
+                })
                     
             except Exception as e:
                 logger.debug(f"항목 파싱 오류: {e}")
@@ -138,29 +136,25 @@ class WeddingExpoScraper:
         return results
     
     def _parse_weddingo(self, html: str, url: str) -> List[Dict]:
-        """weddingo.kr 파싱"""
         results = []
         soup = BeautifulSoup(html, 'lxml')
         
-        # 페이지 내 모든 섹션 탐색
-        sections = soup.select('section, div[class*="expo"], div[class*="wedding"], div[class*="event"]')
+        sections = soup.select('section, div[class*="expo"], div[class*="wedding"], div[class*="event"], article, .card')
         
         for section in sections:
             try:
-                # 텍스트에서 광주 검색
                 text = section.get_text()
+                
                 if '광주' not in text:
                     continue
                 
-                # 제목
-                title_elem = section.select_one('h2, h3, h4, a')
+                title_elem = section.select_one('h1, h2, h3, h4, a, .title, .name')
                 title = title_elem.get_text(strip=True) if title_elem else ""
                 
-                if not title:
+                if not title or len(title) < 2:
                     continue
                 
-                # 날짜, 장소
-                date_elem = section.select_one('[class*="date"], [class*="schedule"], time')
+                date_elem = section.select_one('[class*="date"], [class*="schedule"], time, .period')
                 date_text = date_elem.get_text(strip=True) if date_elem else ""
                 
                 location_elem = section.select_one('[class*="location"], [class*="venue"], [class*="place"]')
@@ -184,20 +178,18 @@ class WeddingExpoScraper:
         return results
     
     def _parse_gjweddingshow(self, html: str, url: str) -> List[Dict]:
-        """gjweddingshow.kr (광주 공식) 파싱"""
         results = []
         soup = BeautifulSoup(html, 'lxml')
         
-        # 메인 컨텐츠 영역 찾기
-        main_content = soup.select_one('main, .content, #content, .main')
+        main_content = soup.select_one('main, .content, #content, .main, .container, body')
         
         if not main_content:
             main_content = soup
         
-        # 스케줄/일정 섹션 찾기
         schedule_selectors = [
-            '.schedule', '.event-list', '.expo-list', '.calendar',
-            '[class*="schedule"]', '[class*="event"]', '[class*="expo"]'
+            '.schedule', '.event-list', '.expo-list', '.calendar', '.program',
+            '[class*="schedule"]', '[class*="event"]', '[class*="expo"]', '[class*="program"]',
+            'article', '.post', '.item', '.card'
         ]
         
         sections = []
@@ -209,10 +201,12 @@ class WeddingExpoScraper:
         
         for section in sections:
             try:
-                title_elem = section.select_one('h2, h3, h4, .title, .name')
+                title_elem = section.select_one('h1, h2, h3, h4, h5, .title, .name, a')
                 title = title_elem.get_text(strip=True) if title_elem else ""
                 
-                # 날짜 추출 - 다양한 형식 지원
+                if not title or len(title) < 2:
+                    continue
+                
                 date_selectors = ['.date', '.schedule', '.period', 'time', 
                                  '[class*="date"]', '[class*="schedule"]']
                 date_text = ""
@@ -222,7 +216,6 @@ class WeddingExpoScraper:
                         date_text = date_elem.get_text(strip=True)
                         break
                 
-                # 장소 추출
                 location_selectors = ['.location', '.venue', '.place',
                                       '[class*="location"]', '[class*="venue"]']
                 location = ""
@@ -232,20 +225,18 @@ class WeddingExpoScraper:
                         location = loc_elem.get_text(strip=True)
                         break
                 
-                # 링크
                 link_elem = section.select_one('a[href]')
                 link = link_elem['href'] if link_elem else ""
                 if link and not link.startswith('http'):
                     link = f"https://www.gjweddingshow.kr{link}"
                 
-                if title:
-                    results.append({
-                        "name": title,
-                        "raw_date": date_text,
-                        "location": location,
-                        "source_url": link,
-                        "source": "gjweddingshow.kr"
-                    })
+                results.append({
+                    "name": title,
+                    "raw_date": date_text,
+                    "location": location,
+                    "source_url": link,
+                    "source": "gjweddingshow.kr"
+                })
                     
             except Exception as e:
                 logger.debug(f"파싱 오류: {e}")
@@ -253,31 +244,60 @@ class WeddingExpoScraper:
         
         return results
     
-    def _parse_fallback(self, html: str, url: str, source_name: str) -> List[Dict]:
-        """폴백 파싱 - 모든 웹페이지에서 웨딩박람회 정보 추출"""
+    def _parse_naver_search(self, html: str, url: str) -> List[Dict]:
+        """네이버 검색 결과 파싱 (웨딩박람회 키워드)"""
         results = []
         soup = BeautifulSoup(html, 'lxml')
         
-        # 모든 링크와 텍스트 탐색
-        all_elements = soup.select('div, section, article, li')
+        items = soup.select('.item, .news, .blog', limit=20)
+        
+        for item in items:
+            try:
+                title_elem = item.select_one('.title, .news_tit, h3, a')
+                title = title_elem.get_text(strip=True) if title_elem else ""
+                
+                if not title or '광주' not in title or '웨딩' not in title:
+                    continue
+                
+                date_elem = item.select_one('.date, .info, time, span:last-child')
+                date_text = date_elem.get_text(strip=True) if date_elem else ""
+                
+                link_elem = item.select_one('a[href]')
+                link = link_elem['href'] if link_elem else ""
+                
+                results.append({
+                    "name": title,
+                    "raw_date": date_text,
+                    "location": "광주광역시",
+                    "source_url": link,
+                    "source": "naver_search"
+                })
+                
+            except Exception as e:
+                continue
+        
+        return results
+    
+    def _parse_fallback(self, html: str, url: str, source_name: str) -> List[Dict]:
+        results = []
+        soup = BeautifulSoup(html, 'lxml')
+        
+        all_elements = soup.select('div, section, article, li, td')
         
         for elem in all_elements:
             try:
                 text = elem.get_text()
                 
-                # 광주 + 웨딩/박람회 관련 키워드 포함 확인
-                keywords = ['웨딩', '박람회', '웨딩박람', '결혼', 'wedding', 'expo']
+                keywords = ['웨딩', '박람회', '웨딩박람', '결혼', 'wedding', 'expo', '페어']
                 has_keyword = any(kw in text for kw in keywords)
                 has_gwangju = '광주' in text
                 
                 if has_keyword and has_gwangju:
-                    # 제목 추출 시도
-                    title_elem = elem.select_one('h1, h2, h3, h4, .title, strong')
+                    title_elem = elem.select_one('h1, h2, h3, h4, .title, strong, a')
                     title = title_elem.get_text(strip=True) if title_elem else elem.get_text()[:100]
                     
-                    # 중복 체크
-                    is_duplicate = any(r['name'] == title for r in results)
-                    if title and not is_duplicate:
+                    is_duplicate = any(r['name'] == title[:50] for r in results)
+                    if title and not is_duplicate and len(title) > 3:
                         results.append({
                             "name": title[:200],
                             "raw_date": "",
@@ -292,7 +312,6 @@ class WeddingExpoScraper:
         return results
     
     def scrape_all(self) -> List[Dict]:
-        """모든 소스에서 스크래핑"""
         all_results = []
         
         for source in SCRAPING_SOURCES:
@@ -310,7 +329,6 @@ class WeddingExpoScraper:
                 logger.warning(f"⚠️ {name}에서 데이터 가져오기 실패")
                 continue
             
-            # 소스별 파싱
             if 'weddingfairschedule' in url:
                 results = self._parse_wedding_fairs_schedule(html, url)
             elif 'weddingo' in url:
@@ -323,11 +341,10 @@ class WeddingExpoScraper:
             logger.info(f"📊 {name}: {len(results)}건 수집")
             all_results.extend(results)
         
-        # 중복 제거 (이름 기준)
         seen = set()
         unique_results = []
         for item in all_results:
-            name_key = item['name'].strip().lower()
+            name_key = item['name'].strip().lower()[:50]
             if name_key not in seen:
                 seen.add(name_key)
                 unique_results.append(item)
@@ -338,7 +355,6 @@ class WeddingExpoScraper:
 
 
 if __name__ == "__main__":
-    # 테스트 실행
     scraper = WeddingExpoScraper()
     results = scraper.scrape_all()
     print(f"\n수집 결과: {len(results)}건")
