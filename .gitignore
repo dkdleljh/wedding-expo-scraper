@@ -19,9 +19,9 @@ env/
 *.log
 logs/
 
-# Data files (개인 데이터는 무시)
-data/*.csv
-!data/.gitkeep
+# Logs
+*.log
+logs/
 
 # OS
 .DS_Store
