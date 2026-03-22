@@ -130,9 +130,10 @@ PLAYWRIGHT_WAIT_TIME = 5000
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 CSV_COLUMNS = [
-    "name", "start_date", "end_date", "location", "organizer",
-    "source_url", "scraped_at", "region",
-    "operating_hours", "contact", "description"
+    "name", "start_date", "end_date", "operating_hours",
+    "location", "organizer", "contact",
+    "source_url", "description",
+    "scraped_at", "region"
 ]
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
