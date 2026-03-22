@@ -8,6 +8,7 @@
 | 기능 | 설명 | 상태 |
 |------|------|------|
 | **병렬 스크래핑** | ThreadPoolExecutor로 동시 6개 소스 처리 | ✅ 완료 |
+| **Playwright 동적 페이지** | JavaScript 렌더링 페이지対応 | ✅ 완료 |
 | **날짜/장소 추출** | 정규식으로 정확한 날짜와 장소 추출 | ✅ 완료 |
 | **Discord 알림** | 신규 웨딩박람회 등록 시 웹훅 알림 | ✅ 완료 |
 | **Telegram 알림** | 텔레그램 봇으로 알림 전송 | ✅ 완료 |
@@ -25,16 +26,17 @@ wedding_expo_scraper/
 │   ├── parser.py          # 데이터 정규화
 │   ├── storage.py         # CSV 저장
 │   ├── notification.py     # 알림 시스템
+│   ├── dynamic_scraper.py  # Playwright 동적 페이지
 │   └── github_sync.py     # GitHub 연동
 ├── data/                  # 데이터 저장
 │   ├── gwangju_wedding_expos.csv
 │   └── logs/
 ├── dashboard.py           # Streamlit 대시보드
-├── main.py                # 메인 실행 파일
+├── main.py               # 메인 실행 파일
 ├── scripts/
 │   └── run_scraper.sh
 ├── requirements.txt
-└── .env                  # 토큰 설정
+└── .env                 # 토큰 설정
 ```
 
 ## 설치 및 설정
@@ -45,7 +47,12 @@ cd /home/zenith/Desktop/wedding_expo_scraper
 pip install -r requirements.txt
 ```
 
-### 2. 알림 설정 (선택사항)
+### 2. Playwright 브라우저 설치 (선택사항)
+```bash
+python -m playwright install chromium
+```
+
+### 3. 알림 설정 (선택사항)
 `.env` 파일 생성:
 ```
 # Discord 웹훅
@@ -54,9 +61,12 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 # Telegram 봇
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
+
+# Playwright 폴백 사용
+USE_PLAYWRIGHT_FALLBACK=true
 ```
 
-### 3. 대시보드 실행 (선택사항)
+### 4. 대시보드 실행 (선택사항)
 ```bash
 pip install streamlit
 streamlit run dashboard.py
@@ -90,7 +100,7 @@ streamlit run dashboard.py
 - weddingfairschedule.kr
 - weddingo.kr
 - gjweddingshow.kr
-- 더 추가 예정
+- 동적 페이지 소스 (Playwright対応)
 
 ## 라이선스
 MIT License
