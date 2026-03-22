@@ -12,7 +12,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT
+from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT, get_gwangju_sources, get_priority_sources
 from wedding_expo_scraper.scraper import WeddingExpoScraper
 from wedding_expo_scraper.dynamic_scraper import DynamicScraper
 from wedding_expo_scraper.parser import ExpoParser
@@ -41,19 +41,22 @@ def main():
     ensure_directories()
     logger = setup_logging()
     
+    priority_sources = get_priority_sources()
+    gwangju_sources = get_gwangju_sources()
+    
     logger.info("=" * 70)
     logger.info("🌸 고도화 웨딩박람회 스크래핑 시작")
     logger.info(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"📊 우선순위 소스: {len(priority_sources)}개")
+    logger.info(f"📊 광주 관련 소스: {len(gwangju_sources)}개")
     logger.info("=" * 70)
     
     try:
-        # 1. 병렬 스크래핑 (정적 페이지)
         logger.info("[1/5] 📡 병렬 스크래핑 중...")
-        scraper = WeddingExpoScraper()
+        scraper = WeddingExpoScraper(sources=priority_sources)
         raw_data = scraper.scrape_all()
         logger.info(f"       ✅ {len(raw_data)}건 수집 (정적)")
         
-        # 1.5 동적 페이지 스크래핑 (JavaScript 렌더링)
         logger.info("       📡 동적 페이지 스크래핑 중...")
         try:
             dynamic_scraper = DynamicScraper()

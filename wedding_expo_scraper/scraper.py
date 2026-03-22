@@ -26,10 +26,11 @@ logger = logging.getLogger(__name__)
 class WeddingExpoScraper:
     """고도화 웨딩박람회 스크래퍼 - 비동기 + 병렬 처리"""
     
-    def __init__(self):
+    def __init__(self, sources: List[Dict] = None):
         self.session = requests.Session()
         self.ua = UserAgent()
         self.current_year = datetime.now().year
+        self.sources = sources if sources is not None else SCRAPING_SOURCES
         
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -375,13 +376,13 @@ class WeddingExpoScraper:
     def scrape_all(self) -> List[Dict]:
         """병렬 스크래핑"""
         logger.info(f"\n{'='*50}")
-        logger.info(f"🚀 병렬 스크래핑 시작 ({len(SCRAPING_SOURCES)}개 소스)")
+        logger.info(f"🚀 병렬 스크래핑 시작 ({len(self.sources)}개 소스)")
         logger.info(f"{'='*50}")
         
         all_results = []
         
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-            futures = {executor.submit(self.scrape_single, source): source for source in SCRAPING_SOURCES}
+            futures = {executor.submit(self.scrape_single, source): source for source in self.sources}
             for future in futures:
                 try:
                     results = future.result()

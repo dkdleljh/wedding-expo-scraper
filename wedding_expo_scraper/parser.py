@@ -100,11 +100,16 @@ class ExpoParser:
             year, month, day = match.groups()
             return f"{year}-{int(month):02d}-{int(day):02d}"
         
-        # 형식 5: YY.MM.DD (짧은 연도)
+        # 형식 5: YY.MM.DD (짧은 연도) - 현재 연도 기준 유연한 처리
         match = re.search(r'^(\d{2})\.(\d{1,2})\.(\d{1,2})$', date_str)
         if match:
             year, month, day = match.groups()
-            full_year = f"20{year}" if int(year) < 50 else f"19{year}"
+            yy = int(year)
+            current_yy = self.current_year % 100  # 2026 → 26
+            if yy <= current_yy:
+                full_year = 2000 + yy  # 현재 세기 이하
+            else:
+                full_year = 1900 + yy  # 과거 세기
             return f"{full_year}-{int(month):02d}-{int(day):02d}"
         
         # 형식 6: MM월 DD일 또는 MM월 DD일(요일)
