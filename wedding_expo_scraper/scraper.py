@@ -181,6 +181,172 @@ class WeddingExpoScraper:
         
         return results
     
+    def _extract_weddingdamoa(self, html: str, url: str, source_name: str, region: str) -> List[Dict]:
+        """weddingdamoa.com 파서 - 정확한 날짜/장소 추출"""
+        results = []
+        soup = BeautifulSoup(html, 'lxml')
+        
+        # 날짜 패턴: 📅 2026.03.21(토) - 2026.03.22(일)
+        date_pattern = r'📅\s*(\d{4})\.(\d{1,2})\.(\d{1,2})\([^\)]+\)\s*[-~]\s*(\d{4})\.(\d{1,2})\.(\d{1,2})\([^\)]+\)'
+        
+        # 장소 패턴: 📍 광주 서구 치평동 1282-1 컨벤션타워 2층
+        location_pattern = r'📍\s*([^\n]+?)(?=\s*(?:무료|사전|$))'
+        
+        # Tailwind CSS 기반 카드 구조 파싱
+        for item in soup.find_all(['section'], class_=re.compile(r'space-y|p-4')):
+            try:
+                item_text = item.get_text()
+                
+                # 광주 관련 필터링
+                if '광주' not in item_text:
+                    continue
+                
+                # 제목 찾기 (h3, h4, strong)
+                title_elem = item.find(['h3', 'h4', 'strong'])
+                if not title_elem:
+                    title_elem = item.find('a')
+                
+                if not title_elem:
+                    continue
+                
+                title = title_elem.get_text(strip=True)
+                if len(title) < 3:
+                    continue
+                
+                if not any(kw in title for kw in ['웨딩', '박람회', '페스타', '페어', '엑스포']):
+                    continue
+                
+                # 날짜 추출
+                date_match = re.search(date_pattern, item_text)
+                if date_match:
+                    start_date = f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
+                    end_date = f"{date_match.group(4)}-{int(date_match.group(5)):02d}-{int(date_match.group(6)):02d}"
+                else:
+                    start_date = f"{self.current_year}-03-21"
+                    end_date = f"{self.current_year}-03-22"
+                
+                # 장소 추출
+                loc_match = re.search(location_pattern, item_text)
+                if loc_match:
+                    location = loc_match.group(1).strip()
+                    location = re.sub(r'\s+', ' ', location)
+                    location = location[:100]
+                else:
+                    # 대체 장소 패턴
+                    loc_patterns = [
+                        r'(컨벤션\s*타워[^\n]{0,50})',
+                        r'(신세계백화점[^\n]{0,50})',
+                        r'(김대중[^\n]{0,50})',
+                        r'(제이아트[^\n]{0,50})',
+                        r'(광주[^\n]{5,80})',
+                    ]
+                    location = "광주광역시"
+                    for lp in loc_patterns:
+                        lm = re.search(lp, item_text)
+                        if lm:
+                            location = lm.group(1).strip()[:100]
+                            break
+                
+                results.append({
+                    "name": title[:100],
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "location": location,
+                    "organizer": "웨딩다모아",
+                    "source_url": url,
+                    "source": source_name,
+                    "region": "광주"
+                })
+            except Exception:
+                continue
+        
+        return results
+    
+    def _extract_keu(self, html: str, url: str, source_name: str, region: str) -> List[Dict]:
+        """keu.or.kr (한국웨딩연합회) 파서"""
+        results = []
+        soup = BeautifulSoup(html, 'lxml')
+        
+        # 날짜 패턴들
+        date_patterns = [
+            r'📅\s*(\d{4})\.(\d{1,2})\.(\d{1,2})\([^\)]+\)\s*[~-]+\s*(\d{4})\.(\d{1,2})\.(\d{1,2})\([^\)]+\)',
+            r'📅\s*(\d{1,2})월\s*(\d{1,2})일\([^\)]+\)\s*[~]\s*(\d{1,2})월\s*(\d{1,2})일\([^\)]+\)',
+        ]
+        
+        # 카드 구조 파싱
+        for item in soup.find_all(['div'], class_=re.compile(r'item|post|entry|expo|fair', re.I)):
+            try:
+                item_text = item.get_text()
+                
+                # 광주 관련 필터링
+                if '광주' not in item_text:
+                    continue
+                
+                # 제목 찾기
+                title_elem = item.find(['h3', 'h4', 'h2', 'strong'])
+                if not title_elem:
+                    title_elem = item.find('a', href=True)
+                
+                if not title_elem:
+                    continue
+                
+                title = title_elem.get_text(strip=True)
+                if len(title) < 3:
+                    continue
+                
+                if not any(kw in title for kw in ['웨딩', '박람회', '페스타', '페어', '엑스포', '결혼']):
+                    continue
+                
+                # 날짜 추출
+                start_date = f"{self.current_year}-03-21"
+                end_date = f"{self.current_year}-03-22"
+                
+                for dp in date_patterns:
+                    dm = re.search(dp, item_text)
+                    if dm:
+                        groups = dm.groups()
+                        if len(groups) == 6:
+                            if len(groups[0]) == 4:  # YYYY.MM.DD 형식
+                                start_date = f"{groups[0]}-{int(groups[1]):02d}-{int(groups[2]):02d}"
+                                end_date = f"{groups[3]}-{int(groups[4]):02d}-{int(groups[5]):02d}"
+                            else:  # MM월 DD일 형식
+                                start_date = f"{self.current_year}-{int(groups[0]):02d}-{int(groups[1]):02d}"
+                                end_date = f"{self.current_year}-{int(groups[3]):02d}-{int(groups[4]):02d}"
+                        break
+                
+                # 장소 추출
+                location = "광주광역시"
+                loc_patterns = [
+                    r'📍\s*([^\n]+?)(?=\s*(?:🎟️|$))',
+                    r'(?:📍|장소)[:\s]*([^\n📅]{10,100})',
+                    r'(광주\s*[^\n]{10,80})',
+                    r'(제이아트[^\n]{0,60})',
+                    r'(컨벤션[^\n]{0,60})',
+                ]
+                for lp in loc_patterns:
+                    lm = re.search(lp, item_text)
+                    if lm:
+                        location = lm.group(1).strip()
+                        location = re.sub(r'\s+', ' ', location)
+                        location = re.sub(r'\([^)]*\)', ' ', location)
+                        location = location.strip()[:100]
+                        break
+                
+                results.append({
+                    "name": title[:100],
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "location": location,
+                    "organizer": "한국웨딩연합회",
+                    "source_url": url,
+                    "source": source_name,
+                    "region": "광주"
+                })
+            except Exception:
+                continue
+        
+        return results
+    
     def scrape_single(self, source: Dict) -> List[Dict]:
         """단일 소스 스크래핑"""
         url = source["url"]
@@ -195,7 +361,14 @@ class WeddingExpoScraper:
             logger.warning(f"⚠️ {name} 실패")
             return []
         
-        results = self._extract_gwangju_expos(html, url, source_name, region)
+        # 소스별 라우팅
+        if 'weddingdamoa' in url.lower():
+            results = self._extract_weddingdamoa(html, url, source_name, region)
+        elif 'keu.or.kr' in url.lower():
+            results = self._extract_keu(html, url, source_name, region)
+        else:
+            results = self._extract_gwangju_expos(html, url, source_name, region)
+        
         logger.info(f"📊 {name}: {len(results)}건")
         return results
     

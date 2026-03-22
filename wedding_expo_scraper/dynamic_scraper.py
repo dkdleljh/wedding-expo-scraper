@@ -191,6 +191,34 @@ class DynamicScraper:
         logger.info(f"📊 동적 스크래핑: {len(results)}건 수집")
         return results
     
+    def scrape_all(self) -> List[Dict]:
+        """전체 동적 소스 스크래핑"""
+        from .config import DYNAMIC_SOURCES
+        
+        all_results = []
+        
+        dynamic_sources = [
+            {"name": "웨딩다모아-전라도", "url": "https://weddingdamoa.com/wedding/jeolla"},
+            {"name": "한국웨딩연합회-전라도", "url": "https://keu.or.kr/region/jeolla/"},
+        ]
+        
+        for source in dynamic_sources:
+            url = source["url"]
+            name = source["name"]
+            
+            logger.info(f"📡 동적 스크래핑: {name}")
+            
+            results = self.scrape_and_extract(url)
+            
+            if results:
+                all_results.extend(results)
+                logger.info(f"📊 {name}: {len(results)}건")
+            else:
+                logger.warning(f"⚠️ {name} 실패")
+        
+        logger.info(f"\n✅ 동적 소스 총 {len(all_results)}건 수집")
+        return all_results
+    
     def scrape_with_fallback(self, url: str, regular_scraper_func) -> List[Dict]:
         """일반 스크래핑 실패 시 Playwright 폴백"""
         import requests

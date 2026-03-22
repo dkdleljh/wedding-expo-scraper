@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT
 from wedding_expo_scraper.scraper import WeddingExpoScraper
+from wedding_expo_scraper.dynamic_scraper import DynamicScraper
 from wedding_expo_scraper.parser import ExpoParser
 from wedding_expo_scraper.storage import DataStorage
 from wedding_expo_scraper.github_sync import GitHubSync
@@ -46,11 +47,22 @@ def main():
     logger.info("=" * 70)
     
     try:
-        # 1. 병렬 스크래핑
+        # 1. 병렬 스크래핑 (정적 페이지)
         logger.info("[1/5] 📡 병렬 스크래핑 중...")
         scraper = WeddingExpoScraper()
         raw_data = scraper.scrape_all()
-        logger.info(f"       ✅ {len(raw_data)}건 수집")
+        logger.info(f"       ✅ {len(raw_data)}건 수집 (정적)")
+        
+        # 1.5 동적 페이지 스크래핑 (JavaScript 렌더링)
+        logger.info("       📡 동적 페이지 스크래핑 중...")
+        try:
+            dynamic_scraper = DynamicScraper()
+            dynamic_data = dynamic_scraper.scrape_all()
+            if dynamic_data:
+                raw_data.extend(dynamic_data)
+                logger.info(f"       ✅ {len(dynamic_data)}건 추가 수집 (동적)")
+        except Exception as e:
+            logger.warning(f"       ⚠️ 동적 스크래핑 실패: {e}")
         
         if not raw_data:
             logger.warning("⚠️ 데이터 없음")
