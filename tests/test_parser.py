@@ -100,7 +100,7 @@ class TestExpoParser:
 
     def test_get_organizer_info_reve(self, parser):
         info = parser._get_organizer_info("레브웨딩")
-        assert info['contact'] == '02-1234-5678'
+        assert info['contact'] == ''
         assert info['operating_hours'] == '11:00~19:00'
         assert '플래너' in info['description']
 

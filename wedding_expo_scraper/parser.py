@@ -45,13 +45,13 @@ class ExpoParser:
             'description': '광주 최대 규모 웨딩박람회 주관사.'
         },
         '레브웨딩': {
-            'contact': '02-1234-5678',
+            'contact': '',
             'operating_hours': '11:00~19:00',
             'website': 'http://revewedding.co.kr/',
             'description': '전국联网 웨딩박람회 주관사. 50여명 플래너 보유, 1:1 맞춤 웨딩 컨설팅 제공.'
         },
         '한국웨딩연합회': {
-            'contact': '02-0000-0000',
+            'contact': '',
             'operating_hours': '10:00~18:00',
             'website': 'http://www.koreaweddingunion.com/',
             'description': '거품없는 결혼준비를 위한 한국웨딩연합회主办 박람회.'
