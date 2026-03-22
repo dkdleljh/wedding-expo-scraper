@@ -1,0 +1,20 @@
+# 광주광역시 웨딩박람회 스크래퍼 의존성
+
+# HTTP 요청
+requests>=2.31.0
+
+# HTML 파싱
+beautifulsoup4>=4.12.3
+lxml>=5.1.0
+
+# 데이터 처리
+pandas>=2.2.1
+
+# GitHub 연동
+GitPython>=3.1.43
+
+# 환경 변수
+python-dotenv>=1.0.1
+
+# User-Agent 랜덤 생성
+fake-useragent>=1.4.0
