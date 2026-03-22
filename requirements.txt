@@ -19,8 +19,15 @@ python-dotenv>=1.0.1
 # User-Agent 랜덤 생성
 fake-useragent>=1.4.0
 
-# 동적 페이지 스크래핑 (선택사항)
+# 동적 페이지 스크래핑
 playwright>=1.40.0
 
-# 설치 후 브라우저 설치 필요:
-# python -m playwright install chromium
+# 대시보드
+streamlit>=1.32.0
+plotly>=5.19.0
+
+# 테스트
+pytest>=8.0.0
+
+# 설치 후 브라우저 설치:
+# playwright install chromium

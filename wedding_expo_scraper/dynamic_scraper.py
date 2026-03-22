@@ -61,13 +61,14 @@ class DynamicScraper:
                 pass
     
     def _extract_date_and_location(self, text: str) -> tuple:
-        """날짜와 장소 추출"""
         date_str = ""
         location_str = "광주광역시"
         
         date_patterns = [
             r'(\d{4})\.(\d{1,2})\.(\d{1,2})',
             r'(\d{1,2})\.(\d{1,2})\.(\d{1,2})',
+            r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일',
+            r'(\d{1,2})월\s*(\d{1,2})일',
         ]
         
         dates_found = []
@@ -77,6 +78,9 @@ class DynamicScraper:
                 if len(match) == 3:
                     if len(match[0]) == 4:
                         year, month, day = match
+                    elif '월' in pattern:
+                        month, day = match[0], match[1]
+                        year = str(self.current_year)
                     else:
                         year = str(self.current_year)
                         month, day = match[1], match[2]
@@ -95,17 +99,21 @@ class DynamicScraper:
                 date_str = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
         
         location_patterns = [
-            r'컨벤션\s*타워[^\n]*',
-            r'신세계백화점[^\n]*',
-            r'킨텍스[^\n]*',
-            r'세텍[^\n]*',
-            r'LG\s*전자[^\n]*',
+            r'컨벤션\s*타워[^\n]{0,50}',
+            r'신세계백화점[^\n]{0,50}',
+            r'킨텍스[^\n]{0,50}',
+            r'세텍[^\n]{0,50}',
+            r'LG\s*전자[^\n]{0,50}',
+            r'김대중[^\n]{0,50}',
+            r'제이아트[^\n]{0,50}',
+            r'염주[^\n]{0,50}',
+            r'광주\s*[^\n]{10,80}',
         ]
         
         for pattern in location_patterns:
             match = re.search(pattern, text)
             if match:
-                location_str = match.group(0)[:50]
+                location_str = match.group(0).strip()[:80]
                 break
         
         return date_str, location_str
