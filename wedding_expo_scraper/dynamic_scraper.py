@@ -197,12 +197,7 @@ class DynamicScraper:
         
         all_results = []
         
-        dynamic_sources = [
-            {"name": "웨딩다모아-전라도", "url": "https://weddingdamoa.com/wedding/jeolla"},
-            {"name": "한국웨딩연합회-전라도", "url": "https://keu.or.kr/region/jeolla/"},
-        ]
-        
-        for source in dynamic_sources:
+        for source in DYNAMIC_SOURCES:
             url = source["url"]
             name = source["name"]
             

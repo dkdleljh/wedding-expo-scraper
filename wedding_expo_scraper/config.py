@@ -82,7 +82,11 @@ PLAYWRIGHT_WAIT_TIME = 5000  # ms
 
 # 동적 페이지 소스 (JavaScript 렌더링 필요)
 DYNAMIC_SOURCES = [
-    # {"name": "동적 페이지 예시", "url": "https://example.com", "wait_selector": ".content"},
+    {"name": "웨딩다모아-전라도", "url": "https://weddingdamoa.com/wedding/jeolla"},
+    {"name": "한국웨딩연합회-전라도", "url": "https://keu.or.kr/region/jeolla/"},
+    {"name": "광주웨딩페스타-공식", "url": "http://gjweddingfesta.com/"},
+    {"name": "웨딩모멘트-광주", "url": "https://weddingmoment.co.kr/jeolla"},
+    {"name": "전라도웨딩박람회", "url": "https://url.kr/p/weddingfair/region/?region=jeolla"},
 ]
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
