@@ -58,7 +58,7 @@ class AutoRelease:
         
         # 데이터 읽기
         storage = DataStorage()
-        csv_path = storage.csv_path
+        csv_path = storage.filepath
         
         data_count = 0
         latest_date = "N/A"
@@ -137,6 +137,51 @@ class AutoRelease:
             logger.error(f"❌ 태그 푸시 실패: {e}")
             return False
     
+    def create_github_release(self, version: str, release_notes: str, tag_name: str = None) -> bool:
+        """GitHub Release 생성 (gh CLI 사용)"""
+        import subprocess
+        
+        if tag_name is None:
+            tag_name = version
+        
+        try:
+            # 릴리즈 노트를 임시 파일에 저장
+            notes_file = Path(self.repo_path) / f".release_notes_{version}.tmp"
+            notes_file.write_text(release_notes, encoding='utf-8')
+            
+            # gh release create 명령 실행
+            cmd = [
+                "gh", "release", "create", tag_name,
+                "--title", f"Wedding Expo Scraper {version}",
+                "--notes-file", str(notes_file),
+                "--latest"
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=self.repo_path
+            )
+            
+            # 임시 파일 삭제
+            if notes_file.exists():
+                notes_file.unlink()
+            
+            if result.returncode == 0:
+                logger.info(f"✅ GitHub Release 생성 완료: {tag_name}")
+                return True
+            else:
+                logger.warning(f"⚠️ GitHub Release 생성 실패: {result.stderr}")
+                return False
+                
+        except FileNotFoundError:
+            logger.warning("⚠️ gh CLI가 설치되지 않았습니다. GitHub Releases에서 수동으로 생성하세요.")
+            return False
+        except Exception as e:
+            logger.error(f"❌ GitHub Release 생성 오류: {e}")
+            return False
+    
     def run(self, create_release: bool = True) -> bool:
         """릴리즈 자동 생성 실행"""
         logger.info("=" * 50)
@@ -164,6 +209,8 @@ class AutoRelease:
             # 태그 푸시
             if create_release:
                 self.push_tag(new_version)
+                # GitHub Release 생성
+                self.create_github_release(new_version, release_notes)
                 logger.info("🎉 GitHub Release 생성 완료!")
         
         logger.info("=" * 50)

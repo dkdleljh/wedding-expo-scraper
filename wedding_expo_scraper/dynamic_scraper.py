@@ -25,10 +25,12 @@ logger = logging.getLogger(__name__)
 class DynamicScraper:
     """Playwright 기반 동적 페이지 스크래퍼"""
     
-    def __init__(self):
+    def __init__(self, sources: List[Dict] = None):
+        from .config import DYNAMIC_SOURCES
         self.current_year = datetime.now().year
         self.playwright = None
         self.browser = None
+        self.sources = sources if sources is not None else DYNAMIC_SOURCES
         
     def _start_browser(self):
         """브라우저 시작"""
@@ -201,11 +203,9 @@ class DynamicScraper:
     
     def scrape_all(self) -> List[Dict]:
         """전체 동적 소스 스크래핑"""
-        from .config import DYNAMIC_SOURCES
-        
         all_results = []
         
-        for source in DYNAMIC_SOURCES:
+        for source in self.sources:
             url = source["url"]
             name = source["name"]
             

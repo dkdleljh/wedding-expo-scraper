@@ -12,7 +12,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT, get_gwangju_sources, get_priority_sources
+from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT, get_gwangju_sources, get_priority_sources, DYNAMIC_SOURCES
 from wedding_expo_scraper.scraper import WeddingExpoScraper
 from wedding_expo_scraper.dynamic_scraper import DynamicScraper
 from wedding_expo_scraper.parser import ExpoParser
@@ -63,7 +63,7 @@ def main():
         
         logger.info("       📡 동적 페이지 스크래핑 중...")
         try:
-            dynamic_scraper = DynamicScraper()
+            dynamic_scraper = DynamicScraper(sources=DYNAMIC_SOURCES)
             dynamic_data = dynamic_scraper.scrape_all()
             if dynamic_data:
                 raw_data.extend(dynamic_data)
