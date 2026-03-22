@@ -1,4 +1,4 @@
-# 광주광역시 웨딩박람회 스크래퍼 의존성
+# 고도화 웨딩박람회 스크래퍼 의존성
 
 # HTTP 요청
 requests>=2.31.0
@@ -18,3 +18,9 @@ python-dotenv>=1.0.1
 
 # User-Agent 랜덤 생성
 fake-useragent>=1.4.0
+
+# 동적 페이지 스크래핑 (선택사항)
+playwright>=1.40.0
+
+# 설치 후 브라우저 설치 필요:
+# python -m playwright install chromium

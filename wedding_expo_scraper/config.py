@@ -56,6 +56,17 @@ REQUEST_DELAY_MIN = 1
 REQUEST_DELAY_MAX = 3
 MAX_CONCURRENT_REQUESTS = 5
 
+# ================================================================================
+# Playwright 동적 페이지 설정
+# ================================================================================
+USE_PLAYWRIGHT_FALLBACK = os.getenv("USE_PLAYWRIGHT_FALLBACK", "true").lower() == "true"
+PLAYWRIGHT_WAIT_TIME = 5000  # ms
+
+# 동적 페이지 소스 (JavaScript 렌더링 필요)
+DYNAMIC_SOURCES = [
+    # {"name": "동적 페이지 예시", "url": "https://example.com", "wait_selector": ".content"},
+]
+
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 CSV_COLUMNS = ["name", "start_date", "end_date", "location", "organizer", "source_url", "scraped_at", "region"]
