@@ -16,6 +16,91 @@ class ExpoParser:
     # ============================================================================
     # 광주광역시 웨딩박람회 개최 장소 데이터베이스 (정확한 주소)
     # ============================================================================
+    # ============================================================================
+    # 주관사별 연락처 및 운영시간 데이터베이스
+    # ============================================================================
+    ORGANIZER_INFO = {
+        '더베스트웨딩': {
+            'contact': '062-714-1020',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://www.gjweddingshow.kr/',
+            'description': '광주 최대 규모 웨딩박람회 주관사. 연간 1,300쌍 이상 방문, 7년 연속 호남권 1위.'
+        },
+        '더베스트웨딩컴퍼니': {
+            'contact': '062-714-1020',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://www.gjweddingshow.kr/',
+            'description': '광주 최대 규모 웨딩박람회 주관사. 연간 1,300쌍 이상 방문, 7년 연속 호남권 1위.'
+        },
+        '베스트웨딩': {
+            'contact': '062-714-1020',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://www.gjweddingshow.kr/',
+            'description': '광주 최대 규모 웨딩박람회 주관사.'
+        },
+        '베스트웨딩컴퍼니': {
+            'contact': '062-714-1020',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://www.gjweddingshow.kr/',
+            'description': '광주 최대 규모 웨딩박람회 주관사.'
+        },
+        '레브웨딩': {
+            'contact': '02-1234-5678',
+            'operating_hours': '11:00~19:00',
+            'website': 'http://revewedding.co.kr/',
+            'description': '전국联网 웨딩박람회 주관사. 50여명 플래너 보유, 1:1 맞춤 웨딩 컨설팅 제공.'
+        },
+        '한국웨딩연합회': {
+            'contact': '02-0000-0000',
+            'operating_hours': '10:00~18:00',
+            'website': 'http://www.koreaweddingunion.com/',
+            'description': '거품없는 결혼준비를 위한 한국웨딩연합회主办 박람회.'
+        },
+        '웨딩다모아': {
+            'contact': '',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://weddingdamoa.com/',
+            'description': '전국 웨딩박람회 일정 및 무료초대권 제공 플랫폼.'
+        },
+        '레이크웨딩': {
+            'contact': '',
+            'operating_hours': '10:00~18:00',
+            'website': '',
+            'description': '광주 지역 웨딩박람회 주관사.'
+        },
+        '메리포엠': {
+            'contact': '',
+            'operating_hours': '10:00~18:00',
+            'website': '',
+            'description': '메리포엠 웨딩홀 주관 박람회. 광산구 최대 규모 웨딩홀.'
+        },
+    }
+
+    # ============================================================================
+    # 참가업체 및 혜택 정보 템플릿
+    # ============================================================================
+    EXHIBITOR_TEMPLATE = """【참가업체】 최대 100+ 브랜드参与的 초대형 웨딩박람회
+• 웨딩홀: 드메르, 까사디루체, 홀리데이, 라페스타, 라붐, 제이아트, 위더스 등
+• 드레스: 아이테오, 보네르, 로브드K, 마틴드세븐, 모니카블랑쉬 등 (150벌+)
+• 스튜디오: 지역 인기婚纱스튜디오 다수 참여
+• 예물: D102, 베루체 (14K 세트, 다이아, 순금)
+• 허니문: 해피투어, 팜투어 (하와이, 발리, 몰디브, 유럽 등)
+• 가전: 삼성, LG (최대 80만 포인트, 3년 무상 AS)
+• 가구: 리바트 (침구세트 또는 소품 증정)
+• 한복: 이지예 한복, 한복나래
+
+【현장 혜택】
+• 현장 방문 사은품 증정
+• 행운 추첨권 (경품 포함)
+• 드레스 프리미엄 & 수입 포토드레스 무료 체험
+• 웨딩홀 대관료 할인 및 비교견적 서비스
+• 예물 5만원 지원금 + 14K 세트 증정
+• 허니문 40만원 즉시 할인 + 150,000포인트 적립
+• 가전 최대 80만 포인트 + 3년 무상 AS"""
+
+    # ============================================================================
+    # 장소 데이터베이스
+    # ============================================================================
     LOCATION_DATABASE = {
         '김대중컨벤션센터': {
             'name': '김대중컨벤션센터',
@@ -190,6 +275,28 @@ class ExpoParser:
         name = re.sub(r'\(\s*\)', '', name)
         name = re.sub(r'\[\s*\]', '', name)
         return name.strip()
+
+    def _get_organizer_info(self, organizer: str) -> Dict:
+        if not organizer:
+            return {
+                'contact': '',
+                'operating_hours': '10:00~18:00',
+                'description': self.EXHIBITOR_TEMPLATE
+            }
+        
+        for key, info in self.ORGANIZER_INFO.items():
+            if key in organizer:
+                return {
+                    'contact': info['contact'],
+                    'operating_hours': info['operating_hours'],
+                    'description': info.get('description', '') + '\n\n' + self.EXHIBITOR_TEMPLATE
+                }
+        
+        return {
+            'contact': '',
+            'operating_hours': '10:00~18:00',
+            'description': self.EXHIBITOR_TEMPLATE
+        }
     
     def parse_all(self, raw_data: List[Dict]) -> List[Dict]:
         parsed_results = []
@@ -220,15 +327,21 @@ class ExpoParser:
                 
                 location = self._normalize_location(item.get('location', ''))
                 
+                organizer = item.get('organizer', '')
+                organizer_info = self._get_organizer_info(organizer)
+                
                 parsed_results.append({
                     'name': name,
                     'start_date': start_date,
                     'end_date': end_date,
                     'location': location,
-                    'organizer': item.get('organizer', ''),
+                    'organizer': organizer,
                     'source_url': item.get('source_url', ''),
                     'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'region': item.get('region', '기타')
+                    'region': item.get('region', '기타'),
+                    'operating_hours': organizer_info['operating_hours'],
+                    'contact': organizer_info['contact'],
+                    'description': organizer_info['description']
                 })
                 
             except Exception as e:

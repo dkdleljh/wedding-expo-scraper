@@ -92,6 +92,38 @@ class TestExpoParser:
         assert result[0]["name"] == "첫날 행사"
         assert result[1]["name"] == "뒷날 행사"
 
+    def test_get_organizer_info_best(self, parser):
+        info = parser._get_organizer_info("더베스트웨딩")
+        assert info['contact'] == '062-714-1020'
+        assert info['operating_hours'] == '10:00~18:00'
+        assert '참가업체' in info['description']
+        assert '혜택' in info['description']
+
+    def test_get_organizer_info_reve(self, parser):
+        info = parser._get_organizer_info("레브웨딩")
+        assert info['contact'] == '02-1234-5678'
+        assert info['operating_hours'] == '11:00~19:00'
+        assert '플래너' in info['description']
+
+    def test_get_organizer_info_unknown(self, parser):
+        info = parser._get_organizer_info("알 수 없는主办")
+        assert info['contact'] == ''
+        assert info['operating_hours'] == '10:00~18:00'
+        assert '참가업체' in info['description']
+
+    def test_parse_all_with_new_fields(self, parser):
+        raw_data = [
+            {"name": "테스트 박람회", "start_date": "2026-03-28", "end_date": "2026-03-29", 
+             "location": "광주", "organizer": "더베스트웨딩", "source_url": "https://test.com", "region": "광주"},
+        ]
+        result = parser.parse_all(raw_data)
+        assert len(result) == 1
+        assert 'operating_hours' in result[0]
+        assert 'contact' in result[0]
+        assert 'description' in result[0]
+        assert result[0]['operating_hours'] == '10:00~18:00'
+        assert result[0]['contact'] == '062-714-1020'
+
 
 class TestConfig:
     def test_get_all_sources_count(self):

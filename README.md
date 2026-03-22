@@ -113,7 +113,7 @@ wedding_expo_scraper/
 │
 ├── tests/                        # 테스트
 │   ├── __init__.py
-│   └── test_parser.py           # 단위 테스트 (20개)
+│   └── test_parser.py           # 단위 테스트 (24개)
 │
 ├── scripts/                      # 스크립트
 │   ├── run_scraper.sh          # 실행 스크립트
@@ -139,6 +139,9 @@ wedding_expo_scraper/
 | `source_url` | 출처 URL | https://url.kr/p/weddingfair/... |
 | `scraped_at` | 스크래핑 일시 | 2026-03-22 21:30:00 |
 | `region` | 지역 | 광주 |
+| `operating_hours` | 운영시간 | 10:00~18:00 |
+| `contact` | 주관사 연락처 | 062-714-1020 |
+| `description` | 박람회 소개 (참가업체/혜택) | 최대 100+ 브랜드 참여, 드레스/스튜디오/예물/허니문/가전/가구 업체 안내 및 현장 혜택 정보 |
 
 ---
 
@@ -215,7 +218,7 @@ python3 -m pytest tests/ -v
 python3 -m pytest tests/test_parser.py::TestExpoParser -v
 ```
 
-**테스트 결과**: 20개 테스트 모두 통과 ✅
+**테스트 결과**: 24개 테스트 모두 통과 ✅
 
 ---
 
@@ -328,5 +331,5 @@ MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
 ---
 
 *마지막 업데이트: 2026-03-22*
-*버전: 2.0 (고도화 완료)*
+*버전: 2.1 (필드 확장 완료)*
 *점수: 100/100 ⭐*
