@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wedding_expo_scraper.tistory_publisher import main
+from wedding_expo_scraper.tistory_web_publisher import main
 
 
 if __name__ == "__main__":

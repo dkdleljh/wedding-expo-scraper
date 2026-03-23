@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import base64
+import json
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +12,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from wedding_expo_scraper.tistory_publisher import build_title, publish_to_tistory, render_html, summarize_dataframe
+from wedding_expo_scraper.tistory_web_publisher import build_manage_url, TistoryWebPublisher
 
 
 def test_summarize_dataframe_builds_counts():
@@ -126,3 +129,20 @@ def test_build_title_uses_week_range():
     )
 
     assert build_title(summary) == "[주간 업데이트] 광주 웨딩박람회 점검 2026-03-23 ~ 2026-03-29"
+
+
+def test_build_manage_url_from_blog_name():
+    assert build_manage_url("sample") == "https://sample.tistory.com/manage/newpost/?type=post"
+
+
+def test_tistory_web_publisher_state_roundtrip(tmp_path):
+    state = {"cookies": [{"name": "a", "value": "b"}], "origins": []}
+    encoded = base64.b64encode(json.dumps(state).encode("utf-8")).decode("utf-8")
+    output = tmp_path / "state.json"
+
+    publisher = TistoryWebPublisher("sample", storage_state_path=output)
+    publisher.save_storage_state_from_b64(encoded, output)
+
+    assert output.exists()
+    exported = publisher.export_storage_state_b64(output)
+    assert base64.b64decode(exported.encode("utf-8")).decode("utf-8").strip().startswith("{")

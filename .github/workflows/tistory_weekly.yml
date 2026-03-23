@@ -22,13 +22,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          python -m playwright install chromium
 
       - name: Publish weekly Tistory post
         env:
-          TISTORY_ACCESS_TOKEN: ${{ secrets.TISTORY_ACCESS_TOKEN }}
           TISTORY_BLOG_NAME: ${{ secrets.TISTORY_BLOG_NAME }}
-          TISTORY_CATEGORY_ID: ${{ secrets.TISTORY_CATEGORY_ID }}
-          TISTORY_TAGS: ${{ secrets.TISTORY_TAGS }}
+          TISTORY_STORAGE_STATE_B64: ${{ secrets.TISTORY_STORAGE_STATE_B64 }}
           GITHUB_REPO_URL: https://github.com/${{ github.repository }}
         run: |
-          python scripts/publish_tistory_weekly.py --publish
+          python scripts/publish_tistory_weekly.py --blog-name "$TISTORY_BLOG_NAME" --import-state-b64 "$TISTORY_STORAGE_STATE_B64"
+          python scripts/publish_tistory_weekly.py --blog-name "$TISTORY_BLOG_NAME" --publish
