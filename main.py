@@ -85,10 +85,17 @@ def main():
         parsed_data = parser.parse_all(raw_data)
         logger.info(f"       ✅ {len(parsed_data)}건 처리")
         
+        storage = DataStorage()
+        merged_data = parser.filter_valid_records(parsed_data)
+        if not merged_data:
+            logger.info("       ⚠️ 신규 유효 데이터가 없어 기존 데이터로 유지")
+            existing_data = storage.load().to_dict('records')
+            merged_data = parser.filter_valid_records(existing_data)
+        logger.info(f"       ✅ 최종 유효 데이터 {len(merged_data)}건")
+        
         # 3. 저장
         logger.info("[3/6] 💾 저장 중...")
-        storage = DataStorage()
-        storage.save(parsed_data)
+        storage.save(merged_data)
         
         # 4. GitHub 동기화
         logger.info("[4/6] 📤 GitHub 동기화...")
@@ -113,18 +120,18 @@ def main():
         # 5. 알림 전송
         logger.info("[5/6] 🔔 알림 전송...")
         notifier = NotificationService()
-        notifier.send_success_notification(len(parsed_data))
+        notifier.send_success_notification(len(merged_data))
         
         # 6. 일일 리포트
         logger.info("[6/6] 📊 일일 리포트...")
         notifier.send_daily_summary({
-            "total": len(parsed_data),
-            "new": len(parsed_data),
+            "total": len(merged_data),
+            "new": len(merged_data),
             "errors": error_count
         })
         
         logger.info("=" * 70)
-        logger.info(f"🎉 완료! (수집: {success_count}건, 오류: {error_count}건)")
+        logger.info(f"🎉 완료! (수집: {success_count}건, 오류: {error_count}건, 최종저장: {len(merged_data)}건)")
         logger.info("=" * 70)
         
         return 0

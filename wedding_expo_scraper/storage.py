@@ -21,6 +21,16 @@ class DataStorage:
     def __init__(self, filepath: Optional[Path] = None):
         self.filepath = filepath or CSV_PATH
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _record_key(self, item: Dict) -> tuple:
+        return (
+            (item.get("name") or "").strip().lower(),
+            (item.get("start_date") or "").strip(),
+            (item.get("end_date") or "").strip(),
+            (item.get("location") or "").strip().lower(),
+            (item.get("source_url") or "").strip().lower(),
+            (item.get("organizer") or "").strip().lower(),
+        )
         
     def load(self) -> pd.DataFrame:
         if not self.filepath.exists():
@@ -37,23 +47,20 @@ class DataStorage:
             return False
         
         try:
-            existing_df = self.load()
             new_df = pd.DataFrame(data)
             
             # 열 순서 맞추기
             available_cols = [col for col in CSV_COLUMNS if col in new_df.columns]
             new_df = new_df[available_cols]
             
-            # 병합 및 중복 제거
-            if not existing_df.empty:
-                existing_names = set(existing_df['name'].str.lower())
-                unique_existing = existing_df[~existing_df['name'].str.lower().isin(new_df['name'].str.lower())]
-                combined_df = pd.concat([new_df, unique_existing], ignore_index=True)
-            else:
-                combined_df = new_df
+            # 중복 제거
+            if not new_df.empty:
+                new_df = new_df.copy()
+                new_df["_dedup_key"] = new_df.apply(lambda row: self._record_key(row.to_dict()), axis=1)
+                new_df = new_df.drop_duplicates(subset="_dedup_key", keep="first").drop(columns=["_dedup_key"])
             
             # 정렬
-            combined_df = combined_df.sort_values(by=['start_date', 'name'], ascending=[True, True]).reset_index(drop=True)
+            combined_df = new_df.sort_values(by=['start_date', 'name', 'source_url'], ascending=[True, True, True]).reset_index(drop=True)
             
             # 저장
             combined_df.to_csv(self.filepath, index=False, encoding='utf-8-sig')

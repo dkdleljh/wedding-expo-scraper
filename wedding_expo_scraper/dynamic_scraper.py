@@ -154,14 +154,14 @@ class DynamicScraper:
             self._close_browser()
             return None
     
-    def scrape_and_extract(self, url: str, wait_selector: str = None) -> List[Dict]:
+    def scrape_and_extract(self, url: str, wait_selector: str = None) -> Optional[List[Dict]]:
         """동적 페이지 스크래핑 + 데이터 추출"""
         from bs4 import BeautifulSoup
         
         html = self.scrape_dynamic_page(url, wait_selector)
         
         if not html:
-            return []
+            return None
         
         soup = BeautifulSoup(html, 'lxml')
         results = []
@@ -212,12 +212,20 @@ class DynamicScraper:
             logger.info(f"📡 동적 스크래핑: {name}")
             
             results = self.scrape_and_extract(url)
-            
+
+            if results is None:
+                logger.info(f"🔁 {name} 재시도")
+                results = self.scrape_and_extract(url)
+
+            if results is None:
+                logger.warning(f"⚠️ {name} 최종 실패")
+                continue
+
             if results:
                 all_results.extend(results)
                 logger.info(f"📊 {name}: {len(results)}건")
             else:
-                logger.warning(f"⚠️ {name} 실패")
+                logger.info(f"ℹ️ {name}: 수집 결과 없음")
         
         logger.info(f"\n✅ 동적 소스 총 {len(all_results)}건 수집")
         return all_results

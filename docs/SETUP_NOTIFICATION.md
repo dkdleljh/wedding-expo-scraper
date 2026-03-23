@@ -1,5 +1,7 @@
 # 알림 설정 가이드
 
+> 알림은 `main.py` 실행 중 최종 실패, 성공 완료, 일일 요약 시점에 사용됩니다. 정적/동적 소스는 내부에서 1회 재시도 후 최종 상태가 알림에 반영됩니다.
+
 ## Discord 웹훅 설정
 
 ### 1. Discord 서버에서 웹훅 생성
@@ -89,7 +91,7 @@ GITHUB_REPO_URL=https://github.com/dkdleljh/wedding-expo-scraper
 |------|------|----------|
 | `send_wedding_expo_notification` | 새 웨딩박람회 발견 | 새 행사 수집 시 |
 | `send_success_notification` | 스크래핑 완료 | 매일 06:00, 18:00 |
-| `send_error_notification` | 오류 발생 | 스크래핑 실패 시 |
+| `send_error_notification` | 최종 실패 또는 예외 | 재시도 후 실패 시 |
 | `send_daily_summary` | 일일 리포트 | 매일 자정 |
 
 ---

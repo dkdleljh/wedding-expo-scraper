@@ -113,7 +113,7 @@ class WeddingExpoScraper:
         
         if 'gjweddingshow' in source:
             date_str, location_str = self._extract_date_and_location(full_text)
-            if '광주' in full_text and ('웨딩' in full_text or '박람회' in full_text):
+            if date_str and '광주' in full_text and ('웨딩' in full_text or '박람회' in full_text):
                 results.append({
                     "name": "2026 광주 웨딩쇼",
                     "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
@@ -169,16 +169,7 @@ class WeddingExpoScraper:
                     item = item.strip()
                     if '광주' in item and any(kw in item for kw in ['웨딩', '박람회', '페스타', '페어']):
                         if not any(r['name'] == item for r in results):
-                            results.append({
-                                "name": item,
-                                "start_date": f"{self.current_year}-03-21",
-                                "end_date": f"{self.current_year}-03-22",
-                                "location": "광주광역시",
-                                "organizer": "",
-                                "source_url": url,
-                                "source": source,
-                                "region": "광주"
-                            })
+                            continue
         
         return results
     
@@ -219,12 +210,10 @@ class WeddingExpoScraper:
                 
                 # 날짜 추출
                 date_match = re.search(date_pattern, item_text)
-                if date_match:
-                    start_date = f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
-                    end_date = f"{date_match.group(4)}-{int(date_match.group(5)):02d}-{int(date_match.group(6)):02d}"
-                else:
-                    start_date = f"{self.current_year}-03-21"
-                    end_date = f"{self.current_year}-03-22"
+                if not date_match:
+                    continue
+                start_date = f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
+                end_date = f"{date_match.group(4)}-{int(date_match.group(5)):02d}-{int(date_match.group(6)):02d}"
                 
                 # 장소 추출
                 loc_match = re.search(location_pattern, item_text)
@@ -299,8 +288,8 @@ class WeddingExpoScraper:
                     continue
                 
                 # 날짜 추출
-                start_date = f"{self.current_year}-03-21"
-                end_date = f"{self.current_year}-03-22"
+                start_date = ""
+                end_date = ""
                 
                 for dp in date_patterns:
                     dm = re.search(dp, item_text)
@@ -314,6 +303,8 @@ class WeddingExpoScraper:
                                 start_date = f"{self.current_year}-{int(groups[0]):02d}-{int(groups[1]):02d}"
                                 end_date = f"{self.current_year}-{int(groups[3]):02d}-{int(groups[4]):02d}"
                         break
+                if not start_date or not end_date:
+                    continue
                 
                 # 장소 추출
                 location = "광주광역시"
@@ -348,7 +339,7 @@ class WeddingExpoScraper:
         
         return results
     
-    def scrape_single(self, source: Dict) -> List[Dict]:
+    def scrape_single(self, source: Dict) -> Optional[List[Dict]]:
         """단일 소스 스크래핑"""
         url = source["url"]
         name = source["name"]
@@ -360,7 +351,7 @@ class WeddingExpoScraper:
         html = self._fetch_page(url)
         if not html:
             logger.warning(f"⚠️ {name} 실패")
-            return []
+            return None
         
         # 소스별 라우팅
         if 'weddingdamoa' in url.lower():
@@ -383,10 +374,23 @@ class WeddingExpoScraper:
         
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
             futures = {executor.submit(self.scrape_single, source): source for source in self.sources}
-            for future in futures:
+            for future, source in futures.items():
                 try:
                     results = future.result()
-                    all_results.extend(results)
+                    if results is None:
+                        logger.info(f"🔁 {source['name']} 재시도")
+                        time.sleep(2)
+                        results = self.scrape_single(source)
+
+                    if results is None:
+                        logger.warning(f"⚠️ {source['name']} 최종 실패")
+                        continue
+
+                    if results:
+                        all_results.extend(results)
+                        logger.info(f"📊 {source['name']}: {len(results)}건")
+                    else:
+                        logger.info(f"ℹ️ {source['name']}: 수집 결과 없음")
                 except Exception as e:
                     logger.error(f"스크래핑 오류: {e}")
         

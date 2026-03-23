@@ -3,11 +3,14 @@
 import pytest
 import sys
 from pathlib import Path
+from datetime import datetime, timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from wedding_expo_scraper.parser import ExpoParser
 from wedding_expo_scraper.config import get_all_sources, get_gwangju_sources, get_priority_sources
+from wedding_expo_scraper.scraper import WeddingExpoScraper
+from wedding_expo_scraper.dynamic_scraper import DynamicScraper
 
 
 class TestExpoParser:
@@ -67,8 +70,8 @@ class TestExpoParser:
 
     def test_parse_all(self, parser):
         raw_data = [
-            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주"},
-            {"name": "전남웨딩박람회", "start_date": "2026-03-29", "end_date": "2026-03-30", "location": "김대중"},
+            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주", "source_url": "https://example.com/1"},
+            {"name": "전남웨딩박람회", "start_date": "2026-03-29", "end_date": "2026-03-30", "location": "김대중", "source_url": "https://example.com/2"},
         ]
         result = parser.parse_all(raw_data)
         assert len(result) == 2
@@ -77,16 +80,16 @@ class TestExpoParser:
 
     def test_parse_all_removes_duplicates(self, parser):
         raw_data = [
-            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주"},
-            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주"},
+            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주", "source_url": "https://example.com/1"},
+            {"name": "광주웨딩박람회", "raw_date": "2026.03.28", "location": "염주", "source_url": "https://example.com/1"},
         ]
         result = parser.parse_all(raw_data)
         assert len(result) == 1
 
     def test_parse_all_sorting(self, parser):
         raw_data = [
-            {"name": "뒷날 행사", "start_date": "2026-03-30", "end_date": "2026-03-30", "location": "광주"},
-            {"name": "첫날 행사", "start_date": "2026-03-28", "end_date": "2026-03-28", "location": "광주"},
+            {"name": "뒷날 행사", "start_date": "2026-03-30", "end_date": "2026-03-30", "location": "염주", "source_url": "https://example.com/2"},
+            {"name": "첫날 행사", "start_date": "2026-03-28", "end_date": "2026-03-28", "location": "김대중", "source_url": "https://example.com/1"},
         ]
         result = parser.parse_all(raw_data)
         assert result[0]["name"] == "첫날 행사"
@@ -113,7 +116,7 @@ class TestExpoParser:
     def test_parse_all_with_new_fields(self, parser):
         raw_data = [
             {"name": "테스트 박람회", "start_date": "2026-03-28", "end_date": "2026-03-29", 
-             "location": "광주", "organizer": "더베스트웨딩", "source_url": "https://test.com"},
+             "location": "염주", "organizer": "더베스트웨딩", "source_url": "https://test.com"},
         ]
         result = parser.parse_all(raw_data)
         assert len(result) == 1
@@ -122,6 +125,60 @@ class TestExpoParser:
         assert 'description' in result[0]
         assert result[0]['operating_hours'] == '10:00~18:00'
         assert result[0]['contact'] == '062-714-1020'
+
+    def test_filter_valid_records_within_3_months(self, parser):
+        today = datetime.now().date()
+        within = parser._add_months(today, 2)
+        cutoff = parser._add_months(today, 3)
+        outside = parser._add_months(today, 4)
+
+        records = [
+            {
+                "name": "유효 행사",
+                "start_date": within.strftime("%Y-%m-%d"),
+                "end_date": within.strftime("%Y-%m-%d"),
+                "location": "염주",
+                "organizer": "레브웨딩",
+                "source_url": "https://example.com/valid",
+            },
+            {
+                "name": "경계 행사",
+                "start_date": cutoff.strftime("%Y-%m-%d"),
+                "end_date": cutoff.strftime("%Y-%m-%d"),
+                "location": "염주",
+                "organizer": "레브웨딩",
+                "source_url": "https://example.com/boundary",
+            },
+            {
+                "name": "초과 행사",
+                "start_date": outside.strftime("%Y-%m-%d"),
+                "end_date": outside.strftime("%Y-%m-%d"),
+                "location": "염주",
+                "organizer": "레브웨딩",
+                "source_url": "https://example.com/outside",
+            },
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 2
+        assert result[0]["name"] == "유효 행사"
+        assert result[1]["name"] == "경계 행사"
+
+    def test_filter_valid_records_rejects_generic_location(self, parser):
+        today = datetime.now().date()
+        records = [
+            {
+                "name": "불명확 행사",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "광주광역시",
+                "organizer": "",
+                "source_url": "https://example.com/generic",
+            }
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 0
 
 
 class TestConfig:
@@ -151,6 +208,40 @@ class TestConfig:
         sources = get_all_sources()
         http_sources = [s for s in sources if s["url"].startswith("http://")]
         assert len(http_sources) == 0, f"http:// sources found: {[s['url'] for s in http_sources]}"
+
+
+class TestRetryLogic:
+    def test_static_scraper_retries_failed_source(self, monkeypatch):
+        scraper = WeddingExpoScraper(sources=[{"name": "테스트", "url": "https://example.com", "region": "광주"}])
+        calls = {"count": 0}
+
+        def fake_scrape_single(source):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return None
+            return [{"name": "행사", "start_date": "2026-04-01", "end_date": "2026-04-01", "location": "염주", "source_url": "https://example.com"}]
+
+        monkeypatch.setattr(scraper, "scrape_single", fake_scrape_single)
+        result = scraper.scrape_all()
+
+        assert calls["count"] == 2
+        assert len(result) == 1
+
+    def test_dynamic_scraper_retries_failed_source(self, monkeypatch):
+        scraper = DynamicScraper(sources=[{"name": "테스트", "url": "https://example.com", "region": "광주"}])
+        calls = {"count": 0}
+
+        def fake_scrape_and_extract(url, wait_selector=None):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return None
+            return [{"name": "행사", "start_date": "2026-04-01", "end_date": "2026-04-01", "location": "염주", "source_url": url}]
+
+        monkeypatch.setattr(scraper, "scrape_and_extract", fake_scrape_and_extract)
+        result = scraper.scrape_all()
+
+        assert calls["count"] == 2
+        assert len(result) == 1
 
 
 if __name__ == "__main__":

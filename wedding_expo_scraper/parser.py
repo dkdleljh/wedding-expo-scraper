@@ -4,7 +4,9 @@
 
 import re
 import logging
-from datetime import datetime
+import calendar
+from urllib.parse import urlparse
+from datetime import datetime, date
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -12,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 class ExpoParser:
     """데이터 정규화"""
+
+    TARGET_WINDOW_MONTHS = 3
     
     # ============================================================================
     # 광주광역시 웨딩박람회 개최 장소 데이터베이스 (정확한 주소)
@@ -172,6 +176,82 @@ class ExpoParser:
     
     def __init__(self):
         self.current_year = datetime.now().year
+
+    def _add_months(self, base_date: date, months: int) -> date:
+        month_index = base_date.month - 1 + months
+        year = base_date.year + month_index // 12
+        month = month_index % 12 + 1
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(base_date.day, last_day)
+        return date(year, month, day)
+
+    def _parse_date_to_date(self, date_str: str) -> Optional[date]:
+        if not date_str:
+            return None
+
+        normalized = self._parse_single_date(date_str)
+        if not normalized:
+            return None
+
+        try:
+            return datetime.strptime(normalized, '%Y-%m-%d').date()
+        except ValueError:
+            return None
+
+    def _is_precise_gwangju_location(self, location: str) -> bool:
+        if not location:
+            return False
+
+        normalized = location.strip()
+        if not normalized or normalized in {"광주", "광주광역시"}:
+            return False
+
+        if "광주" not in normalized:
+            return False
+
+        for data in self.LOCATION_DATABASE.values():
+            if data["name"] in normalized or data["address"] in normalized:
+                return True
+
+        for keyword in self.LOCATION_DATABASE.keys():
+            if keyword in normalized:
+                return True
+
+        if re.search(r'\d{1,4}\s?(층|F)', normalized):
+            return True
+
+        if re.search(r'\d{2,4}-\d{1,4}', normalized):
+            return True
+
+        return False
+
+    def _record_key(self, item: Dict) -> tuple:
+        return (
+            (item.get("name") or "").strip().lower(),
+            (item.get("start_date") or "").strip(),
+            (item.get("end_date") or "").strip(),
+            (item.get("location") or "").strip().lower(),
+            (item.get("source_url") or "").strip().lower(),
+            (item.get("organizer") or "").strip().lower(),
+        )
+
+    def _build_description(self, name: str, organizer: str, location: str, source_url: str) -> str:
+        organizer_info = self._get_organizer_info(organizer)
+        description = (organizer_info.get('description') or '').strip()
+        if description:
+            return description
+
+        source_host = urlparse(source_url).netloc.replace('www.', '')
+
+        if organizer and location:
+            return f"{organizer} 주관의 {location} 웨딩박람회입니다."
+        if organizer:
+            return f"{organizer} 주관의 광주광역시 웨딩박람회입니다."
+        if name:
+            if source_host:
+                return f"{name} 관련 웨딩박람회 정보입니다. 출처: {source_host}"
+            return f"{name} 관련 웨딩박람회 정보입니다."
+        return "광주광역시 웨딩박람회 정보입니다."
         
     def _parse_single_date(self, date_str: str) -> Optional[str]:
         if not date_str:
@@ -337,14 +417,21 @@ class ExpoParser:
                         end_date = start_date
                 
                 if not start_date:
-                    start_date = datetime.now().strftime('%Y-%m-%d')
+                    continue
                 if not end_date:
                     end_date = start_date
                 
                 location = self._normalize_location(item.get('location', ''))
+                if not self._is_precise_gwangju_location(location):
+                    continue
                 
                 organizer = item.get('organizer', '')
                 organizer_info = self._get_organizer_info(organizer)
+
+                source_url = item.get('source_url', '')
+                if not source_url:
+                    continue
+                description = self._build_description(name, organizer, location, source_url)
                 
                 parsed_results.append({
                     'name': name,
@@ -354,8 +441,8 @@ class ExpoParser:
                     'location': location,
                     'organizer': organizer,
                     'contact': organizer_info['contact'],
-                    'source_url': item.get('source_url', ''),
-                    'description': organizer_info['description']
+                    'source_url': source_url,
+                    'description': description
                 })
                 
             except Exception as e:
@@ -365,12 +452,62 @@ class ExpoParser:
         seen = set()
         unique_results = []
         for item in parsed_results:
-            name_key = item['name'].strip().lower()
-            if name_key not in seen:
-                seen.add(name_key)
+            record_key = self._record_key(item)
+            if record_key not in seen:
+                seen.add(record_key)
                 unique_results.append(item)
         
         unique_results.sort(key=lambda x: (x['start_date'], x['name']))
         logger.info(f"✅ 파싱 완료: {len(unique_results)}건")
         
         return unique_results
+
+    def filter_valid_records(self, records: List[Dict]) -> List[Dict]:
+        today = datetime.now().date()
+        cutoff = self._add_months(today, self.TARGET_WINDOW_MONTHS)
+
+        filtered = []
+        seen = set()
+
+        for item in records:
+            try:
+                start_date = self._parse_date_to_date(item.get('start_date', ''))
+                end_date = self._parse_date_to_date(item.get('end_date', '')) or start_date
+                location = self._normalize_location(item.get('location', ''))
+                source_url = (item.get('source_url') or '').strip()
+
+                if not start_date or not end_date:
+                    continue
+                if start_date < today or start_date > cutoff:
+                    continue
+                if not self._is_precise_gwangju_location(location):
+                    continue
+                if not source_url:
+                    continue
+
+                cleaned = dict(item)
+                cleaned['start_date'] = start_date.strftime('%Y-%m-%d')
+                cleaned['end_date'] = end_date.strftime('%Y-%m-%d')
+                cleaned['location'] = location
+                cleaned['source_url'] = source_url
+                cleaned['description'] = self._build_description(
+                    cleaned.get('name', ''),
+                    cleaned.get('organizer', ''),
+                    cleaned.get('location', ''),
+                    cleaned.get('source_url', ''),
+                )
+                organizer_info = self._get_organizer_info(cleaned.get('organizer', ''))
+                cleaned['operating_hours'] = cleaned.get('operating_hours') or organizer_info['operating_hours']
+                cleaned['contact'] = cleaned.get('contact') or organizer_info['contact']
+
+                record_key = self._record_key(cleaned)
+                if record_key in seen:
+                    continue
+                seen.add(record_key)
+                filtered.append(cleaned)
+            except Exception as e:
+                logger.warning(f"필터링 오류: {e}")
+                continue
+
+        filtered.sort(key=lambda x: (x['start_date'], x['name']))
+        return filtered
