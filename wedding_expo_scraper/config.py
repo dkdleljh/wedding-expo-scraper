@@ -18,6 +18,12 @@ CSV_PATH = DATA_DIR / CSV_FILENAME
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "")
+TISTORY_ACCESS_TOKEN = os.getenv("TISTORY_ACCESS_TOKEN", "")
+TISTORY_BLOG_NAME = os.getenv("TISTORY_BLOG_NAME", "")
+TISTORY_CATEGORY_ID = os.getenv("TISTORY_CATEGORY_ID", "")
+TISTORY_TAGS = os.getenv("TISTORY_TAGS", "웨딩박람회,광주,주간업데이트")
+TISTORY_VISIBILITY = int(os.getenv("TISTORY_VISIBILITY", "3"))
+TISTORY_ACCEPT_COMMENT = int(os.getenv("TISTORY_ACCEPT_COMMENT", "1"))
 
 # ================================================================================
 # 정적 스크래핑 소스 (30개+)

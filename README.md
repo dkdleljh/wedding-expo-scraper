@@ -48,6 +48,12 @@
 - 버전 관리로 데이터 이력 추적
 - 어디서든 데이터 접근 가능
 
+### 6️⃣ 티스토리 주간 자동 발행
+- 매주 월요일에 주간 요약 글 자동 생성
+- CSV 기준 점검 결과, 월별 분포, 주요 일정 요약 포함
+- `--dry-run`으로 본문 미리보기 가능
+- GitHub Actions로 자동 실행 가능
+
 ---
 
 ## 🚀 빠른 시작
@@ -87,6 +93,8 @@ EOF
 ```
 
 자세한 알림 설정은 [docs/SETUP_NOTIFICATION.md](docs/SETUP_NOTIFICATION.md)를 참고하세요.
+
+티스토리 주간 발행 설정은 [docs/TISTORY_WEEKLY.md](docs/TISTORY_WEEKLY.md)를 참고하세요.
 
 ---
 
