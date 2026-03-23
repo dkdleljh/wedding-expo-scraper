@@ -45,34 +45,40 @@ class ExpoParser:
             'description': '광주 최대 규모 웨딩박람회 주관사.'
         },
         '레브웨딩': {
-            'contact': '',
+            'contact': '02-6959-2764',
             'operating_hours': '11:00~19:00',
             'website': 'http://revewedding.co.kr/',
             'description': '전국联网 웨딩박람회 주관사. 50여명 플래너 보유, 1:1 맞춤 웨딩 컨설팅 제공.'
         },
         '한국웨딩연합회': {
-            'contact': '',
+            'contact': '02-3474-8800',
             'operating_hours': '10:00~18:00',
-            'website': 'http://www.koreaweddingunion.com/',
-            'description': '거품없는 결혼준비를 위한 한국웨딩연합회主办 박람회.'
+            'website': 'https://keu.or.kr/',
+            'description': '한국웨딩연합회主办 박람회. 전라·제주 지역 웨딩박람회 주관.'
         },
         '웨딩다모아': {
-            'contact': '',
+            'contact': '1661-8639',
             'operating_hours': '10:00~18:00',
             'website': 'https://weddingdamoa.com/',
             'description': '전국 웨딩박람회 일정 및 무료초대권 제공 플랫폼.'
         },
         '레이크웨딩': {
-            'contact': '',
+            'contact': '062-380-1000',
             'operating_hours': '10:00~18:00',
             'website': '',
-            'description': '광주 지역 웨딩박람회 주관사.'
+            'description': '광주 지역 웨딩박람회 주관사. 컨벤션타워 웨딩박람회 주관.'
         },
         '메리포엠': {
-            'contact': '',
+            'contact': '062-942-0100',
             'operating_hours': '10:00~18:00',
             'website': '',
             'description': '메리포엠 웨딩홀 주관 박람회. 광산구 최대 규모 웨딩홀.'
+        },
+        '정우웨딩': {
+            'contact': '062-222-2344',
+            'operating_hours': '10:00~18:00',
+            'website': 'https://www.jwoowedding.com/',
+            'description': '광주 웨딩플래너 컨설팅 전문. 김대중컨벤션센터 웨딩박람회 주관.'
         },
     }
 
@@ -107,12 +113,22 @@ class ExpoParser:
             'address': '광주 북구 동문대로 168번길 6 (두암동)',
             'description': '혼수가전 상담 가능'
         },
-        '염주체육관': {
+        '염주종합체육관': {
             'name': '염주종합체육관',
-            'address': '광주 서구 금화로 278',
+            'address': '광주 서구 금화로 278 (풍암동 423-2)',
+            'description': '최대 규모 웨딩박람회 개최 가능'
+        },
+        '염주': {
+            'name': '염주종합체육관',
+            'address': '광주 서구 금화로 278 (풍암동 423-2)',
             'description': '최대 규모 웨딩박람회 개최 가능'
         },
         '유니버시아드': {
+            'name': '광주여대 유니버시아드 체육관',
+            'address': '광주 광산구 광주여대길 6 (산정동 158)',
+            'description': '광산구 최대 체육관'
+        },
+        '여대': {
             'name': '광주여대 유니버시아드 체육관',
             'address': '광주 광산구 광주여대길 6 (산정동 158)',
             'description': '광산구 최대 체육관'
@@ -131,6 +147,26 @@ class ExpoParser:
             'name': '메리포엠 웨딩홀',
             'address': '광주 광산구 무진대로 282 (우산동 1589-1)',
             'description': ''
+        },
+        '빛고을': {
+            'name': '빛고을체육관',
+            'address': '광주 서구 금화로 278 (풍암동 423-2)',
+            'description': '염주종합체육관 부지 내'
+        },
+        '빛고을체육관': {
+            'name': '빛고을체육관',
+            'address': '광주 서구 금화로 278 (풍암동 423-2)',
+            'description': '염주종합체육관 부지 내'
+        },
+        '서광주': {
+            'name': 'LG전자베스트샵 서광주본점',
+            'address': '광주 서구 상무대로 886 (쌍촌동 982-24)',
+            'description': '서구 소재 전자기기 매장'
+        },
+        '365': {
+            'name': '365婚礼Hall',
+            'address': '광주광역시',
+            'description': '365일 운영婚礼홀'
         },
     }
     
