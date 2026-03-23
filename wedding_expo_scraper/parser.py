@@ -52,13 +52,13 @@ class ExpoParser:
             'contact': '02-6959-2764',
             'operating_hours': '11:00~19:00',
             'website': 'http://revewedding.co.kr/',
-            'description': '전국联网 웨딩박람회 주관사. 50여명 플래너 보유, 1:1 맞춤 웨딩 컨설팅 제공.'
+            'description': '전국 연동 웨딩박람회 주관사. 50여명 플래너 보유, 1:1 맞춤 웨딩 컨설팅 제공.'
         },
         '한국웨딩연합회': {
             'contact': '02-3474-8800',
             'operating_hours': '10:00~18:00',
             'website': 'https://keu.or.kr/',
-            'description': '한국웨딩연합회主办 박람회. 전라·제주 지역 웨딩박람회 주관.'
+            'description': '한국웨딩연합회 주관 박람회. 전라·제주 지역 웨딩박람회 주관.'
         },
         '웨딩다모아': {
             'contact': '1661-8639',
@@ -168,9 +168,9 @@ class ExpoParser:
             'description': '서구 소재 전자기기 매장'
         },
         '365': {
-            'name': '365婚礼Hall',
+            'name': '365 Wedding Hall',
             'address': '광주광역시',
-            'description': '365일 운영婚礼홀'
+            'description': '365일 운영 웨딩홀'
         },
     }
     

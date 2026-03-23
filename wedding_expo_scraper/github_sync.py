@@ -219,7 +219,7 @@ class GitHubSync:
             return False
     
     def sync(self, auto_commit: bool = True, auto_push: bool = True) -> bool:
-        """전체 동기화流程"""
+        """전체 동기화 흐름"""
         try:
             # Git 저장소 확인
             if not self.is_git_repo():

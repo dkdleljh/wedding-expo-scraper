@@ -113,7 +113,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
 ## 문제 해결
 
 ### 알림이 오지 않는 경우
-1. `.env` 파일 확인 → 값이正しく 입력되었는지
+1. `.env` 파일 확인 → 값이 올바르게 입력되었는지
 2. Discord/Telegram 토큰 유효성 확인
 3. 인터넷 연결 상태 확인
 4. 로그 확인: `tail -f /tmp/wedding_expo_cron.log`

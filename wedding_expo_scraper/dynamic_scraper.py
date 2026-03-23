@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Playwright 동적 페이지 스크래핑 모듈
-JavaScript로 렌더링되는 페이지対応
+JavaScript로 렌더링되는 페이지 지원
 """
 
 import re
@@ -140,7 +140,7 @@ class DynamicScraper:
                 try:
                     page.wait_for_selector(wait_selector, timeout=10000)
                 except PlaywrightTimeout:
-                    logger.warning(f"⚠️ 선택자 '{wait_selector}' 대기超时")
+                    logger.warning(f"⚠️ 선택자 '{wait_selector}' 대기 시간 초과")
             
             html = page.content()
             

@@ -108,7 +108,7 @@ class TestExpoParser:
         assert '플래너' in info['description']
 
     def test_get_organizer_info_unknown(self, parser):
-        info = parser._get_organizer_info("알 수 없는主办")
+        info = parser._get_organizer_info("알 수 없는 주관사")
         assert info['contact'] == ''
         assert info['operating_hours'] == '10:00~18:00'
         assert info['description'] == ''
