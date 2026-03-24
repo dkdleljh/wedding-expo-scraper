@@ -15,6 +15,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 CSV_FILENAME = "gwangju_wedding_expos.csv"
 CSV_PATH = DATA_DIR / CSV_FILENAME
+DB_PATH = DATA_DIR / "wedding_expos.db"
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "")

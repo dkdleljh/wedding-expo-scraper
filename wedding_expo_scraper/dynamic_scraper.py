@@ -122,36 +122,38 @@ class DynamicScraper:
     
     def scrape_dynamic_page(self, url: str, wait_selector: str = None) -> Optional[str]:
         """동적 페이지 스크래핑"""
-        if not self._start_browser():
+        if not PLAYWRIGHT_AVAILABLE:
+            logger.warning("⚠️ Playwright가 설치되지 않았습니다")
             return None
         
         try:
-            context = self.browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-            page = context.new_page()
-            
-            logger.info(f"📡 Playwright로 페이지 로드: {url}")
-            
-            page.goto(url, wait_until='networkidle', timeout=REQUEST_TIMEOUT * 1000)
-            
-            if wait_selector:
-                try:
-                    page.wait_for_selector(wait_selector, timeout=10000)
-                except PlaywrightTimeout:
-                    logger.warning(f"⚠️ 선택자 '{wait_selector}' 대기 시간 초과")
-            
-            html = page.content()
-            
-            context.close()
-            self._close_browser()
-            
-            return html
-            
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-dev-shm-usage']
+                )
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+                page = context.new_page()
+                
+                logger.info(f"📡 Playwright로 페이지 로드: {url}")
+                
+                page.goto(url, wait_until='networkidle', timeout=REQUEST_TIMEOUT * 1000)
+                
+                if wait_selector:
+                    try:
+                        page.wait_for_selector(wait_selector, timeout=10000)
+                    except PlaywrightTimeout:
+                        logger.warning(f"⚠️ 선택자 '{wait_selector}' 대기 시간 초과")
+                
+                html = page.content()
+                browser.close()
+                return html
+                
         except Exception as e:
             logger.error(f"❌ 동적 페이지 스크래핑 실패: {e}")
-            self._close_browser()
             return None
     
     def scrape_and_extract(self, url: str, wait_selector: str = None) -> Optional[List[Dict]]:

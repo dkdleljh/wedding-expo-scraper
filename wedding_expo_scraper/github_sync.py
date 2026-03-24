@@ -81,41 +81,8 @@ class GitHubSync:
             return False
     
     def configure_https_auth(self) -> bool:
-        """HTTPS 인증 설정 (Token)"""
-        token = GITHUB_TOKEN
-        
-        if not token:
-            logger.warning("GitHub Token이 설정되지 않았습니다.")
-            return False
-        
-        try:
-            repo = self._get_repo()
-            
-            # 현재 URL 가져오기
-            if 'origin' not in repo.remotes:
-                logger.error("원격 저장소가 설정되지 않았습니다.")
-                return False
-            
-            remote = repo.remotes.origin
-            current_url = remote.url
-            
-            # 토큰 기반 URL로 변환
-            if 'github.com' in current_url:
-                # URL에서 사용자명 추출
-                parts = current_url.replace('https://github.com/', '').replace('.git', '').split('/')
-                if len(parts) >= 2:
-                    username = parts[0]
-                    new_url = f"https://{token}@github.com/{username}/{parts[1]}.git"
-                    remote.set_url(new_url)
-                    logger.info("✅ GitHub Token 인증 설정 완료")
-                    return True
-            
-            logger.warning("URL 형식이 올바르지 않습니다.")
-            return False
-            
-        except GitCommandError as e:
-            logger.error(f"❌ 인증 설정 실패: {e}")
-            return False
+        """HTTPS 인증 설정 (사용 중단 - 보안을 위해 push 시점에만 주입)"""
+        return True
     
     def has_changes(self) -> bool:
         """변경 사항 확인"""
@@ -210,12 +177,19 @@ class GitHubSync:
                 return False
             
             origin = repo.remotes.origin
-            origin.push(refspec=f"HEAD:refs/heads/{repo.active_branch.name}")
+            push_url = origin.url
+            
+            # 보안: .git/config에 토큰을 저장하지 않고 push 명령어 실행 시에만 동적으로 주입
+            if GITHUB_TOKEN and push_url.startswith('https://github.com'):
+                push_url = push_url.replace('https://', f'https://x-access-token:{GITHUB_TOKEN}@')
+            
+            repo.git.push(push_url, f"HEAD:refs/heads/{repo.active_branch.name}")
             logger.info("✅ 푸시 완료")
             return True
             
         except GitCommandError as e:
-            logger.error(f"❌ 푸시 실패: {e}")
+            error_msg = str(e).replace(GITHUB_TOKEN, "***REDACTED***") if GITHUB_TOKEN else str(e)
+            logger.error(f"❌ 푸시 실패: {error_msg}")
             return False
     
     def sync(self, auto_commit: bool = True, auto_push: bool = True) -> bool:
