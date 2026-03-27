@@ -1,346 +1,193 @@
-# 🌸 광주광역시 웨딩박람회 자동 스크래핑 프로그램
+# 광주 웨딩박람회 스크래퍼
 
-> **달력 기준 3개월** 범위의 광주광역시 웨딩박람회 일정을 수집하고, 실패 소스는 자동 재시도하며, 유효 데이터만 저장합니다.
+광주권 웨딩박람회 일정을 수집해 정규화하고, SQLite/CSV로 저장하며, 필요 시 GitHub 동기화와 티스토리 발행까지 연결하는 운영형 스크래퍼입니다.
 
----
+현재 코드는 다음 운영 원칙을 기준으로 구성되어 있습니다.
 
-## 📌 한눈에 보기
+- 수집 범위는 `오늘 ~ 달력 기준 3개월`
+- 동일 행사는 출처가 달라도 canonical 레코드로 병합
+- 실패 소스뿐 아니라 `연속 0건` 소스도 자동 격리
+- `dry-run`으로 저장/배포 없이 프리체크 가능
+- 프로덕션 실행은 가드 스크립트가 프리체크 후 본실행
 
-| 항목 | 내용 |
-|------|------|
-| **수집 지역** | 광주광역시 + 전라도 지역 |
-| **데이터 범위** | 달력 기준 향후 3개월 |
-| **자동 실행** | 매일 06:00, 18:00 |
-| **총 데이터** | 원본 30건 / 유효 25건 |
-| **향후 데이터** | 유효 데이터 25건 (2026-03-23 기준) |
-| **알림** | Discord, Telegram 지원 |
-| **점검 결과** | 100/100 |
-
----
-
-## ✨ 주요 기능
-
-### 1️⃣ 자동 데이터 수집
-- **46개 소스**를 정의하고, 실행 시 **광주/전국 우선순위 40개 소스**를 병렬 수집
-- **정적 페이지**: BeautifulSoup 기반 HTML 파싱
-- **동적 페이지**: Playwright 기반 JavaScript 렌더링
-- **날짜 형식**: 8가지 형식 자동 인식 (YYYY-MM-DD, YY.MM.DD, 3월 28일 등)
-- **실패 재시도**: 정적/동적 소스 모두 최종 실패 전에 1회 재시도
-
-### 2️⃣ 정확한 주소 데이터베이스
-- **11개 장소**의 정확한 주소 사전 등록
-- 주소 자동 교정 기능
-- GPS 좌표 없이도 광주 지역 상세 주소 제공
-
-### 3️⃣ 무인 자동화
-- **Cron 스케줄러**: 매일 06:00, 18:00 자동 실행
-- **재시도 로직**: 실패 소스 자동 재시도
-- **오류 알림**: 실패 시 Discord/Telegram으로 알림
-- **저장 정책**: 검증을 통과한 데이터만 CSV에 저장
-
-### 4️⃣ 데이터 시각화
-- **Streamlit 대시보드**: 웹 브라우저에서 데이터 확인
-- **Plotly 차트**: 월별/장소별 분포 시각화
-- **CSV 내보내기**: 데이터 다운로드 기능
-
-### 5️⃣ GitHub 자동 동기화
-- 데이터 변경 시 자동 커밋
-- 버전 관리로 데이터 이력 추적
-- 어디서든 데이터 접근 가능
-
-### 6️⃣ 티스토리 주간 자동 발행
-- 매주 월요일에 주간 요약 글 자동 생성
-- CSV 기준 점검 결과, 월별 분포, 주요 일정 요약 포함
-- `--dry-run`으로 본문 미리보기 가능
-- 웹 로그인 세션 파일을 저장해서 Playwright로 자동 발행
-- GitHub Actions로 자동 실행 가능
-
----
-
-## 🚀 빠른 시작
-
-### 1단계: 의존성 설치
+## 빠른 시작
 
 ```bash
-# 프로젝트 폴더로 이동
 cd /home/zenith/Desktop/wedding_expo_scraper
-
-# 의존성 설치
 pip install -r requirements.txt
-
-# Playwright 브라우저 설치 (동적 페이지용)
 playwright install chromium
 ```
 
-### 2단계: 스크래핑 실행
+점검만 실행:
 
 ```bash
-# 수동으로 스크래핑 실행
-python3 main.py
+python3 main.py --dry-run --skip-github --skip-tistory --skip-notify
+```
 
-# 대시보드 실행 (웹 브라우저에서 확인)
+운영 실행:
+
+```bash
+python3 main.py
+```
+
+가드 포함 운영 실행:
+
+```bash
+bash scripts/run_production_guarded.sh
+```
+
+대시보드:
+
+```bash
 streamlit run dashboard.py
 ```
 
-### 3단계: 알림 설정 (선택사항)
+## 실행 모드
+
+`main.py`는 아래 옵션을 지원합니다.
+
+- `--dry-run`: 저장/배포 없이 수집, 정규화, 헬스 리포트만 실행
+- `--skip-github`: GitHub 동기화 생략
+- `--skip-tistory`: 티스토리 포스팅 생략
+- `--skip-notify`: Discord/Telegram 알림 생략
+- `--ignore-health`: 서킷 브레이커 무시
+
+운영 권장 경로는 `scripts/run_production_guarded.sh`입니다. 이 스크립트는:
+
+1. `dry-run` 프리체크 실행
+2. 최신 헬스 리포트 검사
+3. 체크된 소스가 전부 실패한 경우 본실행 중단
+4. 조건이 괜찮으면 본실행 수행
+
+## 현재 데이터 계약
+
+저장 컬럼:
+
+- `name`
+- `start_date`
+- `end_date`
+- `operating_hours`
+- `location`
+- `organizer`
+- `contact`
+- `source_url`
+- `description`
+- `region`
+- `source`
+
+정규화 특징:
+
+- 날짜는 `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYY년 M월 D일`, `YY.MM.DD`, `M월 D일`, 날짜 범위를 처리
+- 장소 별칭은 광주 상세 주소로 승격
+- `광주 웨딩 페스타`와 `광주웨딩페스타` 같은 표기 차이는 canonicalization으로 병합
+
+## 소스 운영 정책
+
+기본값은 `PRODUCTION_SOURCE_MODE=ON`입니다. 이 모드에서는 전체 소스가 아니라 검증된 활성 소스셋만 사용합니다.
+
+헬스 정책:
+
+- 연속 실패 `SOURCE_FAILURE_THRESHOLD` 이상이면 격리
+- 연속 0건 `SOURCE_ZERO_RESULT_THRESHOLD` 이상이면 격리
+- 격리 유지 시간은 `SOURCE_COOLDOWN_HOURS`
+
+헬스 파일:
+
+- 상태 저장: `data/source_health.json`
+- 최신 리포트: `data/logs/latest_source_health_report.json`
+
+## 대시보드
+
+`dashboard.py`는 다음 탭을 제공합니다.
+
+- 전체 일정
+- 통계
+- 다가오는 일정
+- 내보내기
+- 소스 상태
+
+소스 상태 탭에서는 최근 실행 기준으로 다음을 확인할 수 있습니다.
+
+- 소스별 상태
+- 연속 실패 수
+- 연속 0건 수
+- 최근 결과 수
+- 이번 실행에서 제외된 소스와 사유
+
+## 자동 실행
+
+크론 설치:
 
 ```bash
-# .env 파일 생성
-cat > .env << 'EOF'
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_TOKEN
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
-TELEGRAM_CHAT_ID=123456789
-EOF
+bash scripts/setup_cron.sh
 ```
 
-자세한 알림 설정은 [docs/SETUP_NOTIFICATION.md](docs/SETUP_NOTIFICATION.md)를 참고하세요.
+설치되는 작업은 `scripts/run_production_guarded.sh`를 호출합니다. 직접 `main.py`를 크론에 붙이는 방식은 권장하지 않습니다.
 
-티스토리 주간 발행 설정은 [docs/TISTORY_WEEKLY.md](docs/TISTORY_WEEKLY.md)를 참고하세요.
+## 릴리즈 자동화
 
----
+이 저장소는 운영 실행 후 자동 릴리즈까지 연결할 수 있습니다.
 
-## 📂 프로젝트 구조
+- 스크립트: [scripts/auto_release.py](/home/zenith/Desktop/wedding_expo_scraper/scripts/auto_release.py)
+- 가드 실행 스크립트는 기본적으로 성공 후 릴리즈를 시도합니다
+- 환경 변수 `AUTO_RELEASE_ON_SUCCESS=false`로 자동 릴리즈를 끌 수 있습니다
 
-```
-wedding_expo_scraper/
-│
-├── wedding_expo_scraper/          # 메인 패키지
-│   ├── __init__.py               # 패키지 초기화
-│   ├── config.py                 # 설정 (소스, 환경변수)
-│   ├── scraper.py                # 병렬 스크래핑 (정적 페이지)
-│   ├── parser.py                 # 데이터 정규화 (날짜/장소)
-│   ├── dynamic_scraper.py        # Playwright 동적 스크래핑
-│   ├── storage.py                # CSV 저장
-│   ├── notification.py           # 알림 시스템 (Discord/Telegram)
-│   └── github_sync.py            # GitHub 자동 동기화
-│
-├── data/                         # 데이터 저장 폴더
-│   ├── gwangju_wedding_expos.csv # 웨딩박람회 데이터
-│   ├── README.md                 # 데이터 문서
-│   └── logs/                     # 실행 로그
-│
-├── docs/                         # 문서
-│   ├── README.md                 # 전체 문서
-│   └── SETUP_NOTIFICATION.md     # 알림 설정 가이드
-│
-├── tests/                        # 테스트
-│   ├── __init__.py
-│   └── test_parser.py           # 단위 테스트 (28개)
-│
-├── scripts/                      # 스크립트
-│   ├── run_scraper.sh          # 실행 스크립트
-│   └── setup_cron.sh           # Cron 설정 스크립트
-│
-├── dashboard.py                  # Streamlit 대시보드
-├── main.py                     # 메인 진입점
-├── requirements.txt             # 의존성 목록
-└── README.md                   # 이 파일
-```
+릴리즈 조건:
 
----
+1. 현재 `HEAD`가 아직 태그되지 않았어야 함
+2. 마지막 semver 태그 이후 새 커밋이 있어야 함
+3. 조건을 만족하면 다음 patch 버전 태그 생성
+4. 태그 푸시 후 GitHub Release 생성
 
-## 📊 수집 데이터 필드
-
-| 필드명 | 설명 | 예시 |
-|--------|------|------|
-| `name` | 박람회명 | 광주 초대형 웨딩박람회 |
-| `start_date` | 시작일 (YYYY-MM-DD) | 2026-03-27 |
-| `end_date` | 종료일 (YYYY-MM-DD) | 2026-03-29 |
-| `operating_hours` | 운영시간 | 10:00~18:00 |
-| `location` | 장소 (주소 포함) | 염주종합체육관, 광주 서구 금화로 278 |
-| `organizer` | 주관사 | 레브웨딩 |
-| `contact` | 주관사 연락처 | 062-714-1020 |
-| `source_url` | 출처 URL | https://url.kr/p/weddingfair/... |
-| `description` | 박람회 소개 | 주관사 소개 및 현장 혜택 정보(일부 항목은 공란 가능) |
-
----
-
-## 🔗 데이터 소스 (46개)
-
-### 공식/주요 소스 (5개)
-| 소스명 | URL | 유형 |
-|--------|-----|------|
-| 더베스트웨딩 | gjweddingshow.kr | 정적 |
-| 광주웨딩페스타 | gjweddingfesta.com | 동적 |
-| 광주컨벤션웨딩박람회 | kjcc.co.kr | 정적 |
-| 김대중컨벤션센터 | convention.kr | 정적 |
-| 광주문화컨벤션센터 | gcccl.or.kr | 정적 |
-
-### 전국 웨딩 사이트 (6개)
-| 소스명 | URL | 유형 |
-|--------|-----|------|
-| Wedding Fair Schedule | weddingfairschedule.kr | 정적 |
-| 웨딩다모아 | weddingdamoa.com | 동적 |
-| 웨딩고 | weddingo.kr | 정적 |
-| 웨딩다이어리 | weddingdiary.co.kr | 정적 |
-| 웨딩박람회투어 | weddingexpo.co.kr | 정적 |
-| 웨딩SNS | weddingsns.com | 정적 |
-
-### 업권협회 (3개)
-| 소스명 | URL | 유형 |
-|--------|-----|------|
-| 한국웨딩연합회 | keu.or.kr | 동적 |
-| 한국웨딩전문가협회 | kawpa.or.kr | 정적 |
-| 한국웨딩산업협회 | krwia.or.kr | 정적 |
-
-### 기타 소스 (32개)
-- 블로그/카페: 7개
-- 결혼정보: 3개
-- API 소스: 5개
-- 기타 웨딩 서비스: 17개
-
----
-
-## ⏰ Cron 설정 (자동 실행)
-
-### 현재 설정
-```
-# WEDDING_EXPO_SCRAPER_CRON
-0 6,18 * * * cd /home/zenith/Desktop/wedding_expo_scraper && /usr/bin/python3 main.py >> /tmp/wedding_expo_cron.log 2>&1
-```
-
-### 의미
-- `0 6,18 * * *` = 매일 06:00, 18:00에 실행
-- `>> /tmp/wedding_expo_cron.log` = 로그 파일에 출력 저장
-
-### Cron 관리 명령어
-```bash
-# Cron 목록 확인
-crontab -l
-
-# Cron 편집
-crontab -e
-
-# Cron 제거 (이 줄만 삭제)
-# # WEDDING_EXPO_SCRAPER_CRON
-```
-
----
-
-## 🧪 테스트 실행
+수동 릴리즈 예시:
 
 ```bash
-# 전체 테스트 실행
 cd /home/zenith/Desktop/wedding_expo_scraper
-python3 -m pytest tests/ -v
-
-# 특정 테스트만 실행
-python3 -m pytest tests/test_parser.py::TestExpoParser -v
+python3 scripts/auto_release.py --version v4.0.0
 ```
 
-**테스트 결과**: 28개 테스트 모두 통과 ✅
+자동 생성되는 릴리즈 노트에는 다음이 들어갑니다.
 
----
+- 기준 커밋
+- CSV 행 수
+- 일정 범위
+- 최근 소스 헬스 요약
+- 이번 실행에서 제외된 소스와 사유
 
-## 📈 시스템 아키텍처
+## 알림과 티스토리
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Scheduler (Cron)                        │
-│                   매일 06:00, 18:00 실행                     │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     main.py                                  │
-│  1. 병렬 스크래핑 (ThreadPoolExecutor)                      │
-│  2. 동적 페이지 스크래핑 (Playwright)                        │
-│  3. 데이터 정규화                                          │
-│  4. 3개월 범위 검증 및 유효 데이터 필터링                   │
-│  5. CSV 저장                                              │
-│  6. GitHub 동기화                                         │
-│  7. 알림 전송                                             │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-        ┌─────────────┼─────────────┐
-        │             │             │
-        ▼             ▼             ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│   정적      │ │   동적      │ │   API       │
-│  스크래핑   │ │  스크래핑   │ │  소스       │
-│  (36개)    │ │  (5개)     │ │  (5개)     │
-└─────────────┘ └─────────────┘ └─────────────┘
-        │             │             │
-        └─────────────┼─────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     데이터 저장                              │
-│  • CSV 파일 (gwangju_wedding_expos.csv)                    │
-│  • GitHub 자동 커밋                                       │
-│  • Streamlit 대시보드                                      │
-└─────────────────────────────────────────────────────────────┘
-```
+알림 환경 변수:
 
----
+- `DISCORD_WEBHOOK_URL`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
 
-## ❓ 자주 묻는 질문
+티스토리 환경 변수:
 
-### Q1: 데이터가 없습니다. 어떻게 해야 하나요?
+- `TISTORY_ACCESS_TOKEN`
+- `TISTORY_BLOG_NAME`
+- `TISTORY_CATEGORY_ID`
+- `TISTORY_TAGS`
+
+티스토리 주간 발행 상세는 [docs/TISTORY_WEEKLY.md](./docs/TISTORY_WEEKLY.md)를 참고하세요.
+
+## 테스트
+
 ```bash
-# 1. 수동으로 스크래핑 실행
-python3 main.py
-
-# 2. 로그 확인
-tail -f /tmp/wedding_expo_cron.log
-
-# 3. 네트워크 연결 확인
-curl -I https://weddingfairschedule.kr
+cd /home/zenith/Desktop/wedding_expo_scraper
+python3 -m pytest -q
 ```
 
-### Q2: Discord/Telegram 알림이 오지 않습니다.
-```bash
-# 1. .env 파일 확인
-cat .env
+현재 회귀 테스트는 파서, 동적 대기 전략, canonical dedupe, 소스 헬스, dry-run 동작까지 포함합니다.
 
-# 2. Discord 웹훅 URL 유효성 확인
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"content": "테스트"}' \
-  YOUR_DISCORD_WEBHOOK_URL
-```
+## 주요 경로
 
-### Q3: Playwright 오류가 발생합니다.
-```bash
-# Playwright 재설치
-pip uninstall playwright
-pip install playwright
-playwright install chromium
-```
-
-### Q4: GitHub 푸시가 실패합니다.
-```bash
-# 1. GitHub 토큰 확인
-cat .env | grep GITHUB_TOKEN
-
-# 2. 원격 저장소 확인
-git remote -v
-
-# 3. 수동 푸시
-git push origin main
-```
-
----
-
-## 📞 지원
-
-- **버그 신고**: GitHub Issues
-- **기능 요청**: GitHub Issues
-- **문서 오류**: GitHub Pull Request
-
----
-
-## 📄 라이선스
-
-MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
-
----
-
-## 🙏 감사의 말
-
-이 프로젝트는 예비 신랑·신부분들의 웨딩박람회 일정을 손쉽게 확인할 수 있도록 도와드립니다. 항상 최신 정보를 유지하는 데 기여해주신 모든 소스 사이트에 감사드립니다.
-
----
-
-*마지막 업데이트: 2026-03-23*
-*버전: 3.1 (현재 점검 기준)*
-*점검 결과: 100/100*
+- 메인 실행: [main.py](/home/zenith/Desktop/wedding_expo_scraper/main.py)
+- 설정: [config.py](/home/zenith/Desktop/wedding_expo_scraper/wedding_expo_scraper/config.py)
+- 파서: [parser.py](/home/zenith/Desktop/wedding_expo_scraper/wedding_expo_scraper/parser.py)
+- 정적 스크래퍼: [scraper.py](/home/zenith/Desktop/wedding_expo_scraper/wedding_expo_scraper/scraper.py)
+- 동적 스크래퍼: [dynamic_scraper.py](/home/zenith/Desktop/wedding_expo_scraper/wedding_expo_scraper/dynamic_scraper.py)
+- 헬스 관리: [source_health.py](/home/zenith/Desktop/wedding_expo_scraper/wedding_expo_scraper/source_health.py)
+- 운영 실행 스크립트: [run_production_guarded.sh](/home/zenith/Desktop/wedding_expo_scraper/scripts/run_production_guarded.sh)
+- 릴리즈 스크립트: [auto_release.py](/home/zenith/Desktop/wedding_expo_scraper/scripts/auto_release.py)
+- 운영 문서: [docs/OPERATIONS.md](/home/zenith/Desktop/wedding_expo_scraper/docs/OPERATIONS.md)

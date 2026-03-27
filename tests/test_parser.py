@@ -180,6 +180,73 @@ class TestExpoParser:
         result = parser.filter_valid_records(records)
         assert len(result) == 0
 
+    def test_filter_valid_records_merges_same_event_across_sources(self, parser):
+        today = datetime.now().date()
+        records = [
+            {
+                "name": "광주 웨딩 페스타",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "LG전자베스트샵 동광주점",
+                "organizer": "",
+                "contact": "",
+                "source_url": "https://source-a.example.com",
+                "description": "",
+                "region": "전국",
+                "source": "Wedding Fair Schedule",
+            },
+            {
+                "name": "광주 웨딩 페스타",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "LG전자베스트샵 동광주점",
+                "organizer": "더베스트웨딩",
+                "contact": "062-714-1020",
+                "source_url": "https://source-b.example.com",
+                "description": "상세 설명",
+                "region": "광주",
+                "source": "광주웨딩페스타",
+            },
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 1
+        assert result[0]["source"] == "광주웨딩페스타"
+        assert result[0]["organizer"] == "더베스트웨딩"
+        assert "광주 북구 동문대로 168번길 6" in result[0]["location"]
+
+    def test_filter_valid_records_merges_name_variants(self, parser):
+        today = datetime.now().date()
+        records = [
+            {
+                "name": "광주 웨딩 페스타",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "LG전자베스트샵 동광주점",
+                "organizer": "",
+                "contact": "",
+                "source_url": "https://source-a.example.com",
+                "description": "",
+                "region": "광주",
+                "source": "전라도웨딩박람회",
+            },
+            {
+                "name": "광주웨딩페스타",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "LG전자베스트샵 동광주점",
+                "organizer": "",
+                "contact": "",
+                "source_url": "https://source-b.example.com",
+                "description": "",
+                "region": "광주",
+                "source": "웨딩모멘트-전라도",
+            },
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 1
+
 
 class TestConfig:
     def test_get_all_sources_count(self):
@@ -242,6 +309,13 @@ class TestRetryLogic:
 
         assert calls["count"] == 2
         assert len(result) == 1
+
+    def test_dynamic_scraper_wait_strategy_for_gjweddingfesta(self):
+        scraper = DynamicScraper()
+        strategy = scraper._get_wait_strategy("https://gjweddingfesta.com/")
+        assert strategy["wait_until"] == "domcontentloaded"
+        assert strategy["selector"] == "h1, h2, h3, section, article"
+        assert strategy["post_wait_ms"] >= 3000
 
 
 if __name__ == "__main__":

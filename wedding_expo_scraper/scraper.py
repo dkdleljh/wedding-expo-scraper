@@ -5,13 +5,12 @@
 """
 
 import re
-import asyncio
 import time
 import random
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,6 +30,7 @@ class WeddingExpoScraper:
         self.ua = UserAgent()
         self.current_year = datetime.now().year
         self.sources = sources if sources is not None else SCRAPING_SOURCES
+        self.last_run_stats: Dict[str, Dict] = {}
         
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -59,26 +59,53 @@ class WeddingExpoScraper:
         """날짜와 장소 추출"""
         date_str = ""
         location_str = "광주광역시"
-        
+
+        range_patterns = [
+            r'(?:(\d{4})년\s*)?(\d{1,2})월\s*(\d{1,2})일\s*[-~]\s*(?:(\d{4})년\s*)?(?:(\d{1,2})월\s*)?(\d{1,2})일',
+            r'(\d{4})\.(\d{1,2})\.(\d{1,2}).{0,10}[-~].{0,10}(\d{4})\.(\d{1,2})\.(\d{1,2})',
+        ]
+
+        dates_found = []
+        for pattern in range_patterns:
+            for match in re.finditer(pattern, text):
+                groups = match.groups()
+                try:
+                    if len(groups) == 6 and "." not in pattern:
+                        start_year = int(groups[0] or self.current_year)
+                        start_month = int(groups[1])
+                        start_day = int(groups[2])
+                        end_year = int(groups[3] or start_year)
+                        end_month = int(groups[4] or start_month)
+                        end_day = int(groups[5])
+                    else:
+                        start_year, start_month, start_day, end_year, end_month, end_day = map(int, groups)
+                    dates_found.extend(
+                        [
+                            datetime(start_year, start_month, start_day),
+                            datetime(end_year, end_month, end_day),
+                        ]
+                    )
+                except ValueError:
+                    continue
+
         date_patterns = [
             r'(\d{4})\.(\d{1,2})\.(\d{1,2})',
-            r'(\d{1,2})\.(\d{1,2})\.(\d{1,2})',
+            r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일',
+            r'(\d{1,2})월\s*(\d{1,2})일',
         ]
-        
-        dates_found = []
+
         for pattern in date_patterns:
             matches = re.findall(pattern, text)
             for match in matches:
-                if len(match) == 3:
-                    if len(match[0]) == 4:
+                try:
+                    if len(match) == 3 and ('년' in pattern or len(match[0]) == 4):
                         year, month, day = match
                     else:
+                        month, day = match[0], match[1]
                         year = str(self.current_year)
-                        month, day = match[1], match[2]
-                    try:
-                        dates_found.append(datetime(int(year), int(month), int(day)))
-                    except ValueError:
-                        continue
+                    dates_found.append(datetime(int(year), int(month), int(day)))
+                except ValueError:
+                    continue
         
         if dates_found:
             dates_found.sort()
@@ -90,12 +117,16 @@ class WeddingExpoScraper:
                 date_str = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
         
         location_patterns = [
+            r'LG전자베스트샵\s*동광주점[^\n]*',
             r'컨벤션\s*타워[^\n]*',
             r'신세계백화점[^\n]*',
             r'김대중\s*컨벤션[^\n]*',
+            r'광주여대[^\n]*유니버시아드\s*체육관[^\n]*',
+            r'더베스트웨딩\s*사옥[^\n]*',
             r'킨텍스[^\n]*',
             r'세텍[^\n]*',
-            r'LG\s*전자[^\n]*',
+            r'제이아트[^\n]*',
+            r'염주[^\n]*',
         ]
         
         for pattern in location_patterns:
@@ -111,7 +142,7 @@ class WeddingExpoScraper:
         soup = BeautifulSoup(html, 'lxml')
         full_text = soup.get_text()
         
-        if 'gjweddingshow' in source:
+        if 'gjweddingshow' in url.lower():
             date_str, location_str = self._extract_date_and_location(full_text)
             if date_str and '광주' in full_text and ('웨딩' in full_text or '박람회' in full_text):
                 results.append({
@@ -371,10 +402,12 @@ class WeddingExpoScraper:
         logger.info(f"{'='*50}")
         
         all_results = []
+        self.last_run_stats = {}
         
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
             futures = {executor.submit(self.scrape_single, source): source for source in self.sources}
-            for future, source in futures.items():
+            for future in as_completed(futures):
+                source = futures[future]
                 try:
                     results = future.result()
                     if results is None:
@@ -384,26 +417,62 @@ class WeddingExpoScraper:
 
                     if results is None:
                         logger.warning(f"⚠️ {source['name']} 최종 실패")
+                        self.last_run_stats[source["name"]] = {
+                            "success": False,
+                            "result_count": 0,
+                            "error": "fetch_failed",
+                            "url": source.get("url", ""),
+                            "kind": "static",
+                        }
                         continue
 
                     if results:
                         all_results.extend(results)
                         logger.info(f"📊 {source['name']}: {len(results)}건")
+                        self.last_run_stats[source["name"]] = {
+                            "success": True,
+                            "result_count": len(results),
+                            "error": "",
+                            "url": source.get("url", ""),
+                            "kind": "static",
+                        }
                     else:
                         logger.info(f"ℹ️ {source['name']}: 수집 결과 없음")
+                        self.last_run_stats[source["name"]] = {
+                            "success": True,
+                            "result_count": 0,
+                            "error": "",
+                            "url": source.get("url", ""),
+                            "kind": "static",
+                        }
                 except Exception as e:
                     logger.error(f"스크래핑 오류: {e}")
+                    self.last_run_stats[source["name"]] = {
+                        "success": False,
+                        "result_count": 0,
+                        "error": str(e),
+                        "url": source.get("url", ""),
+                        "kind": "static",
+                    }
         
         seen = set()
         unique_results = []
         for item in all_results:
-            name_key = item['name'].strip().lower()[:50]
-            if name_key not in seen:
-                seen.add(name_key)
+            item_key = (
+                item.get('name', '').strip().lower(),
+                item.get('start_date', '').strip(),
+                item.get('location', '').strip().lower(),
+                item.get('source_url', '').strip().lower(),
+            )
+            if item_key not in seen:
+                seen.add(item_key)
                 unique_results.append(item)
         
         logger.info(f"\n✅ 총 {len(unique_results)}건 수집 완료")
         return unique_results
+
+    def get_last_run_stats(self) -> Dict[str, Dict]:
+        return dict(self.last_run_stats)
 
 
 if __name__ == "__main__":

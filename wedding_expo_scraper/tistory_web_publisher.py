@@ -252,7 +252,7 @@ class TistoryWebPublisher:
             kwargs["storage_state"] = str(self.storage_state_path)
         return browser.new_context(**kwargs)
 
-    def _fill_editor(self, page, html_content: str) -> None:
+    def _fill_editor(self, page, title: str) -> None:
         if not _set_input_value(
             page,
             [
@@ -262,12 +262,9 @@ class TistoryWebPublisher:
                 'textarea[placeholder*="제목"]',
                 'input[type="text"]',
             ],
-            html_content,
+            title,
         ):
             raise RuntimeError("제목 입력창을 찾지 못했습니다.")
-
-        if not _inject_html_into_page(page, html_content):
-            raise RuntimeError("본문 편집기를 찾지 못했습니다.")
 
     def publish(self, title: str, content: str) -> PublishResult:
         if not self.blog_name:

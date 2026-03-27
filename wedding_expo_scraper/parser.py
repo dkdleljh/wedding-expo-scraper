@@ -17,6 +17,17 @@ class ExpoParser:
     """데이터 정규화 및 보안 처리 클래스"""
 
     TARGET_WINDOW_MONTHS = 3
+    SOURCE_PREFERENCE = {
+        '더베스트웨딩': 100,
+        '광주웨딩페스타': 95,
+        '한국웨딩연합회-전라도-Dynamic': 90,
+        '한국웨딩연합회-전라도': 85,
+        '웨딩모멘트-전라도-Dynamic': 80,
+        '웨딩모멘트-전라도': 75,
+        '전라도웨딩박람회': 70,
+        'Wedding Fair Schedule': 65,
+        '광주웨딩페스타-Dynamic': 60,
+    }
     
     # ============================================================================
     # 광주광역시 웨딩박람회 개최 장소 데이터베이스 (정확한 주소)
@@ -38,7 +49,7 @@ class ExpoParser:
             'contact': '02-6959-2764',
             'operating_hours': '11:00~19:00',
             'website': 'http://revewedding.co.kr/',
-            'description': '전국 연동 웨딩박람회 주관사.'
+            'description': '전국 연동 웨딩박람회와 웨딩 플래너 상담을 운영하는 주관사.'
         },
         '한국웨딩연합회': {
             'contact': '02-3474-8800',
@@ -65,7 +76,17 @@ class ExpoParser:
             'address': '광주 서구 치평동 1282-1',
             'description': '도심 접근성 우수'
         },
+        '컨벤션 타워': {
+            'name': '컨벤션타워',
+            'address': '광주 서구 치평동 1282-1',
+            'description': '도심 접근성 우수'
+        },
         '신세계백화점': {
+            'name': '신세계백화점 광주신세계점',
+            'address': '광주 서구 무진대로 932',
+            'description': '8층 이벤트관'
+        },
+        '광주신세계점': {
             'name': '신세계백화점 광주신세계점',
             'address': '광주 서구 무진대로 932',
             'description': '8층 이벤트관'
@@ -74,6 +95,41 @@ class ExpoParser:
             'name': '제이아트웨딩컨벤션',
             'address': '광주 서구 풍서좌로 269',
             'description': '웨딩 전문 시설'
+        },
+        '염주': {
+            'name': '염주종합체육관',
+            'address': '광주 서구 금화로 278',
+            'description': '광주 대표 행사 공간'
+        },
+        '염주종합체육관': {
+            'name': '염주종합체육관',
+            'address': '광주 서구 금화로 278',
+            'description': '광주 대표 행사 공간'
+        },
+        '김대중': {
+            'name': '김대중컨벤션센터',
+            'address': '광주 서구 상무누리로 30',
+            'description': '광주 최대 전시시설'
+        },
+        '신세계': {
+            'name': '신세계백화점 광주신세계점',
+            'address': '광주 서구 무진대로 932',
+            'description': '8층 이벤트관'
+        },
+        'LG전자베스트샵 동광주점': {
+            'name': 'LG전자베스트샵 동광주점',
+            'address': '광주 북구 동문대로 168번길 6',
+            'description': '가전/웨딩 프로모션 행사장'
+        },
+        '광주여대 유니버시아드 체육관': {
+            'name': '광주여대 유니버시아드 체육관',
+            'address': '광주 광산구 광주여대길 6',
+            'description': '대형 행사 체육관'
+        },
+        '더베스트웨딩 사옥': {
+            'name': '더베스트웨딩 사옥',
+            'address': '광주 동구 서석로 13-1 3층',
+            'description': '더베스트웨딩 운영 공간'
         },
     }
     
@@ -112,6 +168,20 @@ class ExpoParser:
         if match:
             year, month, day = match.groups()
             return f"{year}-{int(month):02d}-{int(day):02d}"
+
+        # 형식 3: YYYY년 M월 D일
+        match = re.search(r'^(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일$', date_str)
+        if match:
+            year, month, day = match.groups()
+            return f"{year}-{int(month):02d}-{int(day):02d}"
+
+        # 형식 4: YY.MM.DD
+        match = re.search(r'^(\d{2})\.(\d{1,2})\.(\d{1,2})$', date_str)
+        if match:
+            year, month, day = match.groups()
+            year_num = int(year)
+            full_year = 2000 + year_num if year_num <= 69 else 1900 + year_num
+            return f"{full_year}-{int(month):02d}-{int(day):02d}"
         
         # 형식 6: MM월 DD일
         match = re.search(r'^(\d{1,2})월\s*(\d{1,2})일', date_str)
@@ -149,6 +219,7 @@ class ExpoParser:
         if not name:
             return ""
         name = self._sanitize_text(name)
+        name = re.sub(r'\s*\(\s*\)\s*', ' ', name)
         name = re.sub(r'\s+', ' ', name)
         return name.strip()
 
@@ -178,30 +249,69 @@ class ExpoParser:
             (item.get("location") or "").strip().lower(),
             (item.get("source_url") or "").strip().lower(),
         )
+
+    def _canonicalize_name(self, name: str) -> str:
+        text = self._normalize_name(name).lower()
+        text = re.sub(r'[\s\-\_\(\)\[\]\'"“”‘’]+', '', text)
+        text = text.replace('페어', '페스타')
+        return text
+
+    def _canonical_record_key(self, item: Dict) -> tuple:
+        return (
+            self._canonicalize_name(item.get("name", "")),
+            (item.get("start_date") or "").strip(),
+            (item.get("end_date") or "").strip(),
+            (item.get("location") or "").strip().lower(),
+        )
+
+    def _record_quality(self, item: Dict) -> tuple:
+        source = (item.get("source") or "").strip()
+        filled_fields = sum(
+            1 for field in ("organizer", "contact", "description", "source_url", "region")
+            if str(item.get(field, "")).strip()
+        )
+        precise_location = 1 if self._is_precise_gwangju_location(item.get("location", "")) else 0
+        source_pref = self.SOURCE_PREFERENCE.get(source, 0)
+        return (source_pref, filled_fields, precise_location, len(str(item.get("description", ""))))
+
+    def _merge_record_pair(self, preferred: Dict, candidate: Dict) -> Dict:
+        merged = dict(preferred)
+        for field in ("operating_hours", "organizer", "contact", "source_url", "description", "region", "source"):
+            preferred_value = str(merged.get(field, "") or "").strip()
+            candidate_value = str(candidate.get(field, "") or "").strip()
+            if not preferred_value and candidate_value:
+                merged[field] = candidate.get(field)
+        return merged
     
     def parse_all(self, raw_data: List[Dict]) -> List[Dict]:
         parsed_results = []
+        seen = set()
         
         for item in raw_data:
             try:
                 name = self._normalize_name(item.get('name', ''))
-                if not name: continue
+                if not name:
+                    continue
                 
-                start_date = self._parse_single_date(item.get('start_date', ''))
-                if not start_date: continue
+                start_date = self._parse_single_date(item.get('start_date', '') or item.get('raw_date', ''))
+                if not start_date:
+                    continue
                 
                 end_date = self._parse_single_date(item.get('end_date', '')) or start_date
                 location = self._normalize_location(item.get('location', ''))
                 
-                if not self._is_precise_gwangju_location(location): continue
+                if not self._is_precise_gwangju_location(location):
+                    continue
                 
                 organizer = self._sanitize_text(item.get('organizer', ''))
                 organizer_info = self._get_organizer_info(organizer)
                 source_url = item.get('source_url', '')
+                region = self._sanitize_text(item.get('region', '광주')) or '광주'
+                source = self._sanitize_text(item.get('source', ''))
                 
                 description = self._sanitize_text(self._build_description(name, organizer, location, source_url))
-                
-                parsed_results.append({
+
+                normalized_item = {
                     'name': name,
                     'start_date': start_date,
                     'end_date': end_date,
@@ -210,31 +320,52 @@ class ExpoParser:
                     'organizer': organizer,
                     'contact': self._sanitize_text(organizer_info['contact']),
                     'source_url': source_url,
-                    'description': description
-                })
+                    'description': description,
+                    'region': region,
+                    'source': source,
+                }
+
+                key = self._record_key(normalized_item)
+                if key in seen:
+                    continue
+                seen.add(key)
+                parsed_results.append(normalized_item)
                 
             except Exception as e:
                 logger.warning(f"파싱 오류: {e}")
                 continue
         
+        parsed_results.sort(key=lambda item: (item['start_date'], item['name'], item['location']))
         return parsed_results
 
     def filter_valid_records(self, records: List[Dict]) -> List[Dict]:
         today = datetime.now().date()
         cutoff = self._add_months(today, self.TARGET_WINDOW_MONTHS)
-        filtered = []
-        seen = set()
+        canonical_records: Dict[tuple, Dict] = {}
 
         for item in records:
             try:
                 start_dt = datetime.strptime(item['start_date'], '%Y-%m-%d').date()
-                if start_dt < today or start_dt > cutoff: continue
+                if start_dt < today or start_dt > cutoff:
+                    continue
+                normalized_item = dict(item)
+                normalized_item['location'] = self._normalize_location(item.get('location', ''))
+                if not self._is_precise_gwangju_location(normalized_item.get('location', '')):
+                    continue
                 
-                key = self._record_key(item)
-                if key in seen: continue
-                seen.add(key)
-                filtered.append(item)
-            except: continue
+                key = self._canonical_record_key(normalized_item)
+                current = canonical_records.get(key)
+                if current is None:
+                    canonical_records[key] = normalized_item
+                    continue
 
+                if self._record_quality(normalized_item) > self._record_quality(current):
+                    canonical_records[key] = self._merge_record_pair(normalized_item, current)
+                else:
+                    canonical_records[key] = self._merge_record_pair(current, normalized_item)
+            except Exception:
+                continue
+
+        filtered = list(canonical_records.values())
         filtered.sort(key=lambda x: (x['start_date'], x['name']))
         return filtered

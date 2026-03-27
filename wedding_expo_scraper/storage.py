@@ -29,8 +29,8 @@ class DataStorage:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # 고유 키(hash)를 포함한 테이블 생성
-                cursor.execute(f'''
+                cursor.execute(
+                    '''
                     CREATE TABLE IF NOT EXISTS wedding_expos (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT,
@@ -42,22 +42,43 @@ class DataStorage:
                         contact TEXT,
                         source_url TEXT,
                         description TEXT,
+                        region TEXT DEFAULT '광주',
+                        source TEXT DEFAULT '',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         UNIQUE(name, start_date, location, source_url)
                     )
-                ''')
+                    '''
+                )
+                self._ensure_columns(cursor)
                 conn.commit()
         except Exception as e:
             logger.error(f"❌ DB 초기화 실패: {e}")
+
+    def _ensure_columns(self, cursor: sqlite3.Cursor):
+        cursor.execute("PRAGMA table_info(wedding_expos)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+        required_columns = {
+            "region": "ALTER TABLE wedding_expos ADD COLUMN region TEXT DEFAULT '광주'",
+            "source": "ALTER TABLE wedding_expos ADD COLUMN source TEXT DEFAULT ''",
+            "updated_at": "ALTER TABLE wedding_expos ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        }
+        for column, ddl in required_columns.items():
+            if column not in existing_columns:
+                cursor.execute(ddl)
 
     def load(self) -> pd.DataFrame:
         """DB에서 데이터 로드"""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                df = pd.read_sql_query("SELECT * FROM wedding_expos ORDER BY start_date ASC", conn)
+                df = pd.read_sql_query("SELECT * FROM wedding_expos ORDER BY start_date ASC, name ASC", conn)
                 # 불필요한 컬럼 제거
                 if 'id' in df.columns:
-                    df = df.drop(columns=['id', 'created_at'], errors='ignore')
+                    df = df.drop(columns=['id', 'created_at', 'updated_at'], errors='ignore')
+                for column in CSV_COLUMNS:
+                    if column not in df.columns:
+                        df[column] = ""
+                df = df[CSV_COLUMNS]
                 return df
         except Exception as e:
             logger.warning(f"로드 실패 (DB -> DataFrame): {e}")
@@ -74,13 +95,23 @@ class DataStorage:
                 cursor = conn.cursor()
                 for item in data:
                     cursor.execute('''
-                        INSERT OR IGNORE INTO wedding_expos 
-                        (name, start_date, end_date, operating_hours, location, organizer, contact, source_url, description)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO wedding_expos 
+                        (name, start_date, end_date, operating_hours, location, organizer, contact, source_url, description, region, source, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT(name, start_date, location, source_url) DO UPDATE SET
+                            end_date=excluded.end_date,
+                            operating_hours=excluded.operating_hours,
+                            organizer=excluded.organizer,
+                            contact=excluded.contact,
+                            description=excluded.description,
+                            region=excluded.region,
+                            source=excluded.source,
+                            updated_at=CURRENT_TIMESTAMP
                     ''', (
                         item.get('name'), item.get('start_date'), item.get('end_date'),
                         item.get('operating_hours'), item.get('location'), item.get('organizer'),
-                        item.get('contact'), item.get('source_url'), item.get('description')
+                        item.get('contact'), item.get('source_url'), item.get('description'),
+                        item.get('region', '광주'), item.get('source', '')
                     ))
                 conn.commit()
             

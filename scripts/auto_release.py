@@ -1,226 +1,222 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-GitHub Release 자동 생성 스크립트
-매일 자동 실행 시 버전 태그 및 릴리즈 노트를 생성합니다.
-"""
+"""GitHub Release 자동 생성 스크립트"""
 
-import os
-import sys
+from __future__ import annotations
+
+import argparse
+import json
 import logging
+import re
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from git import Repo
 from git.exc import GitCommandError
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+from wedding_expo_scraper.config import CSV_PATH, SOURCE_HEALTH_REPORT_PATH
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
+SEMVER_PATTERN = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 
 class AutoRelease:
-    """자동 릴리즈 생성기"""
-    
-    def __init__(self, repo_path: str = None):
-        self.repo_path = repo_path or Path(__file__).parent.parent
+    def __init__(self, repo_path: Optional[Path] = None):
+        self.repo_path = Path(repo_path or Path(__file__).parent.parent)
         self.repo = Repo(self.repo_path)
-    
-    def get_current_version(self) -> str:
-        """현재 버전 가져오기"""
-        tags = sorted([t.name for t in self.repo.tags], reverse=True)
-        if tags:
-            return tags[0]
-        return "v0.0.0"
-    
-    def get_last_release_date(self) -> str:
-        """마지막 릴리즈 날짜"""
+
+    def _run_git(self, *args: str) -> str:
+        return self.repo.git.execute(["git", *args]).strip()
+
+    def get_latest_semver_tag(self) -> str:
+        versions = []
+        for tag in self.repo.tags:
+            match = SEMVER_PATTERN.match(tag.name)
+            if match:
+                versions.append((tuple(int(part) for part in match.groups()), tag.name))
+        if not versions:
+            return "v0.0.0"
+        versions.sort()
+        return versions[-1][1]
+
+    def head_is_tagged(self) -> bool:
         try:
-            commits = list(self.repo.iter_commits(max_count=1))
-            if commits:
-                return commits[0].committed_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        except:
-            pass
-        return datetime.now().strftime('%Y-%m-%d')
-    
-    def should_create_release(self) -> bool:
-        """릴리즈 생성 조건 확인"""
-        # 데이터 변경이 있는 경우
-        if self.repo.is_dirty(untracked_files=True):
+            self._run_git("describe", "--tags", "--exact-match", "HEAD")
             return True
-        return False
-    
-    def create_release_notes(self, version: str) -> str:
-        """릴리즈 노트 생성"""
-        from wedding_expo_scraper.storage import DataStorage
-        import pandas as pd
-        
-        # 데이터 읽기
-        storage = DataStorage()
-        csv_path = storage.filepath
-        
-        data_count = 0
-        latest_date = "N/A"
-        
-        if csv_path.exists():
+        except GitCommandError:
+            return False
+
+    def has_new_commits_since_tag(self, tag_name: str) -> bool:
+        if tag_name == "v0.0.0":
+            return True
+        commits = self._run_git("rev-list", f"{tag_name}..HEAD", "--count")
+        return int(commits or "0") > 0
+
+    def bump_patch_version(self, version: str) -> str:
+        match = SEMVER_PATTERN.match(version)
+        if not match:
+            raise ValueError(f"semver 태그가 아닙니다: {version}")
+        major, minor, patch = (int(part) for part in match.groups())
+        return f"v{major}.{minor}.{patch + 1}"
+
+    def collect_release_context(self) -> dict:
+        context = {
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "head_commit": self.repo.head.commit.hexsha[:8],
+            "head_message": self.repo.head.commit.message.strip(),
+            "csv_rows": 0,
+            "health": {},
+        }
+        if CSV_PATH.exists():
             try:
-                df = pd.read_csv(csv_path)
-                data_count = len(df)
-                if 'start_date' in df.columns:
-                    latest_date = df['start_date'].max()
-            except:
+                import pandas as pd
+
+                df = pd.read_csv(CSV_PATH)
+                context["csv_rows"] = len(df)
+                if not df.empty and "start_date" in df.columns:
+                    context["date_min"] = str(df["start_date"].min())
+                    context["date_max"] = str(df["start_date"].max())
+            except Exception:
                 pass
-        
-        notes = f"""# 🎉 Release {version}
 
-**배포일**: {datetime.now().strftime('%Y-%m-%d')}  
-**자동 생성**: 매일 스크래핑 시스템
+        if SOURCE_HEALTH_REPORT_PATH.exists():
+            try:
+                context["health"] = json.loads(SOURCE_HEALTH_REPORT_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                context["health"] = {}
+        return context
 
----
+    def create_release_notes(self, version: str) -> str:
+        context = self.collect_release_context()
+        health = context.get("health", {})
+        checked = int(health.get("checked_sources", 0))
+        healthy = int(health.get("healthy_sources", 0))
+        failed = int(health.get("failed_sources", 0))
+        skipped = health.get("skipped_sources", [])
+        skipped_lines = "\n".join(
+            f"- {item.get('name', '')}: {item.get('reason', '')}" for item in skipped
+        ) or "- 없음"
 
-## 📊 이번 업데이트
+        top_sources = health.get("sources", {})
+        source_lines = []
+        for source_name, stats in sorted(top_sources.items()):
+            source_lines.append(
+                f"- {source_name}: success={stats.get('success')} result_count={stats.get('result_count', 0)} kind={stats.get('kind', '')}"
+            )
+        source_summary = "\n".join(source_lines) or "- 없음"
 
-| 항목 | 내용 |
-|------|------|
-| 데이터 건수 | {data_count}건 |
-| 최신 일정 | {latest_date} |
-| 생성 시간 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |
+        return f"""# {version}
 
----
+## 배포 개요
 
-## 🔄 자동 업데이트 내역
+- 배포 시각: {context.get('generated_at')}
+- 기준 커밋: `{context.get('head_commit')}` {context.get('head_message')}
+- CSV 행 수: {context.get('csv_rows', 0)}
+- 일정 범위: {context.get('date_min', 'N/A')} ~ {context.get('date_max', 'N/A')}
 
-이 버전은 매일 자동 스크래핑 시스템에 의해 생성되었습니다.
+## 이번 버전 핵심
 
-### 업데이트 내용
-- 데이터 스크래핑 ({data_count}건)
-- 날짜/장소 정규화
-- GitHub 자동 동기화
-- 알림 발송
+- 프로덕션 소스 모드 도입
+- canonical dedupe 및 행사명 canonicalization 적용
+- 실패/연속 0건 기반 서킷 브레이커 추가
+- dry-run, guarded run, source health report 운영 경로 추가
+- 대시보드 소스 상태 탭 추가
+- 문서 전면 한글 정비
 
----
+## 소스 헬스 요약
 
-*Auto-generated by Wedding Expo Scraper*
+- checked_sources: {checked}
+- healthy_sources: {healthy}
+- failed_sources: {failed}
+
+### 이번 실행에서 제외된 소스
+{skipped_lines}
+
+### 최근 소스 실행 요약
+{source_summary}
 """
-        return notes
-    
-    def create_tag(self, version: str, message: str = None) -> bool:
-        """태그 생성"""
+
+    def create_tag(self, version: str, message: str) -> None:
+        self.repo.create_tag(version, message=message)
+        logger.info("✅ 태그 생성: %s", version)
+
+    def push_tag(self, version: str) -> None:
+        self.repo.remote("origin").push(version)
+        logger.info("✅ 태그 푸시 완료: %s", version)
+
+    def create_github_release(self, version: str, release_notes: str) -> None:
+        notes_file = self.repo_path / f".release_notes_{version}.md"
+        notes_file.write_text(release_notes, encoding="utf-8")
         try:
-            # 기존 태그 확인
-            existing = [t.name for t in self.repo.tags]
-            if version in existing:
-                logger.info(f"⚠️ 태그 {version} 이미 존재")
-                return True
-            
-            # 태그 생성
-            if message is None:
-                message = f"Release {version}"
-            
-            self.repo.create_tag(version, message=message)
-            logger.info(f"✅ 태그 생성: {version}")
-            return True
-            
-        except GitCommandError as e:
-            logger.error(f"❌ 태그 생성 실패: {e}")
-            return False
-    
-    def push_tag(self, version: str) -> bool:
-        """태그 푸시"""
-        try:
-            origin = self.repo.remote('origin')
-            origin.push(version)
-            logger.info(f"✅ 태그 푸시 완료: {version}")
-            return True
-        except GitCommandError as e:
-            logger.error(f"❌ 태그 푸시 실패: {e}")
-            return False
-    
-    def create_github_release(self, version: str, release_notes: str, tag_name: str = None) -> bool:
-        """GitHub Release 생성 (gh CLI 사용)"""
-        import subprocess
-        
-        if tag_name is None:
-            tag_name = version
-        
-        try:
-            # 릴리즈 노트를 임시 파일에 저장
-            notes_file = Path(self.repo_path) / f".release_notes_{version}.tmp"
-            notes_file.write_text(release_notes, encoding='utf-8')
-            
-            # gh release create 명령 실행
-            cmd = [
-                "gh", "release", "create", tag_name,
-                "--title", f"Wedding Expo Scraper {version}",
-                "--notes-file", str(notes_file),
-                "--latest"
-            ]
-            
-            result = subprocess.run(
-                cmd,
+            subprocess.run(
+                [
+                    "gh",
+                    "release",
+                    "create",
+                    version,
+                    "--title",
+                    f"Wedding Expo Scraper {version}",
+                    "--notes-file",
+                    str(notes_file),
+                    "--latest",
+                ],
+                cwd=self.repo_path,
+                check=True,
                 capture_output=True,
                 text=True,
-                cwd=self.repo_path
             )
-            
-            # 임시 파일 삭제
+            logger.info("✅ GitHub Release 생성 완료: %s", version)
+        finally:
             if notes_file.exists():
                 notes_file.unlink()
-            
-            if result.returncode == 0:
-                logger.info(f"✅ GitHub Release 생성 완료: {tag_name}")
-                return True
-            else:
-                logger.warning(f"⚠️ GitHub Release 생성 실패: {result.stderr}")
-                return False
-                
-        except FileNotFoundError:
-            logger.warning("⚠️ gh CLI가 설치되지 않았습니다. GitHub Releases에서 수동으로 생성하세요.")
-            return False
-        except Exception as e:
-            logger.error(f"❌ GitHub Release 생성 오류: {e}")
-            return False
-    
-    def run(self, create_release: bool = True) -> bool:
-        """릴리즈 자동 생성 실행"""
-        logger.info("=" * 50)
-        logger.info("🚀 자동 릴리즈 생성 시작")
-        logger.info("=" * 50)
-        
-        # 현재 버전
-        current_version = self.get_current_version()
-        logger.info(f"현재 버전: {current_version}")
-        
-        # 변경 사항 확인
-        if not self.should_create_release():
-            logger.info("변경 사항 없어 릴리즈 생성을 건너뜁니다.")
-            return True
-        
-        # 새 버전 생성 (날짜 기반)
-        new_version = f"v{datetime.now().strftime('%Y.%m.%d')}"
-        logger.info(f"새 버전: {new_version}")
-        
-        # 릴리즈 노트 생성
-        release_notes = self.create_release_notes(new_version)
-        
-        # 태그 생성
-        if self.create_tag(new_version, release_notes):
-            # 태그 푸시
-            if create_release:
-                self.push_tag(new_version)
-                # GitHub Release 생성
-                self.create_github_release(new_version, release_notes)
-                logger.info("🎉 GitHub Release 생성 완료!")
-        
-        logger.info("=" * 50)
-        return True
+
+    def run(self, version: Optional[str] = None, push: bool = True, create_release: bool = True) -> Optional[str]:
+        if self.head_is_tagged():
+            logger.info("HEAD가 이미 태그되어 있어 릴리즈를 건너뜁니다.")
+            return None
+
+        latest_tag = self.get_latest_semver_tag()
+        if not self.has_new_commits_since_tag(latest_tag):
+            logger.info("마지막 태그 이후 새 커밋이 없어 릴리즈를 건너뜁니다.")
+            return None
+
+        target_version = version or self.bump_patch_version(latest_tag)
+        release_notes = self.create_release_notes(target_version)
+        self.create_tag(target_version, release_notes)
+        if push:
+            self.push_tag(target_version)
+        if create_release:
+            self.create_github_release(target_version, release_notes)
+        return target_version
 
 
-def main():
-    release = AutoRelease()
-    release.run()
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="GitHub Release 자동 생성")
+    parser.add_argument("--version", default="", help="직접 지정할 태그 버전 (예: v4.0.0)")
+    parser.add_argument("--no-push", action="store_true", help="태그 푸시 생략")
+    parser.add_argument("--no-release", action="store_true", help="GitHub Release 생성 생략")
+    return parser.parse_args(argv)
+
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    releaser = AutoRelease()
+    version = releaser.run(
+        version=args.version or None,
+        push=not args.no_push,
+        create_release=not args.no_release,
+    )
+    if version:
+        logger.info("🎉 릴리즈 완료: %s", version)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

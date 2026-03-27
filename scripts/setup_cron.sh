@@ -8,9 +8,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-PYTHON_PATH=$(which python3 || which python)
-
-CRON_JOB="0 6,18 * * * cd $PROJECT_DIR && $PYTHON_PATH main.py >> /tmp/wedding_expo_cron.log 2>&1"
+RUNNER_SCRIPT="$PROJECT_DIR/scripts/run_production_guarded.sh"
+CRON_JOB="0 6,18 * * * bash $RUNNER_SCRIPT >> /tmp/wedding_expo_cron.log 2>&1"
 CRON_MARKER="# WEDDING_EXPO_SCRAPER_CRON"
 
 echo "🌸 광주광역시 웨딩박람회 스크래핑 - Cron 설정"
@@ -46,6 +45,7 @@ echo "4️⃣  설정 확인..."
 echo ""
 echo "   📅 실행 스케줄: 매일 06:00, 18:00"
 echo "   📂 프로젝트: $PROJECT_DIR"
+echo "   ▶️ 실행 스크립트: $RUNNER_SCRIPT"
 echo "   📝 로그 파일: /tmp/wedding_expo_cron.log"
 echo ""
 crontab -l | grep "$CRON_MARKER" || true
@@ -65,7 +65,7 @@ echo "=============================================="
 echo "✅ Cron 설정 완료!"
 echo ""
 echo "📌 수동으로 실행하려면:"
-echo "   cd $PROJECT_DIR && python main.py"
+echo "   bash $RUNNER_SCRIPT"
 echo ""
 echo "📌 로그 확인:"
 echo "   tail -f /tmp/wedding_expo_cron.log"

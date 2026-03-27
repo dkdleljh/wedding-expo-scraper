@@ -21,6 +21,24 @@ from .config import REQUEST_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
+WAIT_STRATEGIES = {
+    "gjweddingfesta.com": {
+        "wait_until": "domcontentloaded",
+        "selector": "h1, h2, h3, section, article",
+        "post_wait_ms": 4000,
+    },
+    "weddingmoment.co.kr": {
+        "wait_until": "domcontentloaded",
+        "selector": "h3, section, article",
+        "post_wait_ms": 2500,
+    },
+    "keu.or.kr": {
+        "wait_until": "domcontentloaded",
+        "selector": "div, section, article",
+        "post_wait_ms": 2500,
+    },
+}
+
 
 class DynamicScraper:
     """Playwright 기반 동적 페이지 스크래퍼"""
@@ -31,6 +49,7 @@ class DynamicScraper:
         self.playwright = None
         self.browser = None
         self.sources = sources if sources is not None else DYNAMIC_SOURCES
+        self.last_run_stats: Dict[str, Dict] = {}
         
     def _start_browser(self):
         """브라우저 시작"""
@@ -65,31 +84,53 @@ class DynamicScraper:
     def _extract_date_and_location(self, text: str) -> tuple:
         date_str = ""
         location_str = "광주광역시"
-        
+
+        range_patterns = [
+            r'(?:(\d{4})년\s*)?(\d{1,2})월\s*(\d{1,2})일\s*[-~]\s*(?:(\d{4})년\s*)?(?:(\d{1,2})월\s*)?(\d{1,2})일',
+            r'(\d{4})\.(\d{1,2})\.(\d{1,2}).{0,10}[-~].{0,10}(\d{4})\.(\d{1,2})\.(\d{1,2})',
+        ]
+
+        dates_found = []
+        for pattern in range_patterns:
+            for match in re.finditer(pattern, text):
+                groups = match.groups()
+                try:
+                    if len(groups) == 6 and "." not in pattern:
+                        start_year = int(groups[0] or self.current_year)
+                        start_month = int(groups[1])
+                        start_day = int(groups[2])
+                        end_year = int(groups[3] or start_year)
+                        end_month = int(groups[4] or start_month)
+                        end_day = int(groups[5])
+                    else:
+                        start_year, start_month, start_day, end_year, end_month, end_day = map(int, groups)
+                    dates_found.extend(
+                        [
+                            datetime(start_year, start_month, start_day),
+                            datetime(end_year, end_month, end_day),
+                        ]
+                    )
+                except ValueError:
+                    continue
+
         date_patterns = [
             r'(\d{4})\.(\d{1,2})\.(\d{1,2})',
-            r'(\d{1,2})\.(\d{1,2})\.(\d{1,2})',
             r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일',
             r'(\d{1,2})월\s*(\d{1,2})일',
         ]
         
-        dates_found = []
         for pattern in date_patterns:
             matches = re.findall(pattern, text)
             for match in matches:
-                if len(match) == 3:
-                    if len(match[0]) == 4:
+                try:
+                    if len(match) == 3 and ('년' in pattern or len(match[0]) == 4):
                         year, month, day = match
-                    elif '월' in pattern:
+                    else:
                         month, day = match[0], match[1]
                         year = str(self.current_year)
-                    else:
-                        year = str(self.current_year)
-                        month, day = match[1], match[2]
-                    try:
-                        dates_found.append(datetime(int(year), int(month), int(day)))
-                    except ValueError:
-                        continue
+                    dates_found.append(datetime(int(year), int(month), int(day)))
+                except ValueError:
+                    continue
         
         if dates_found:
             dates_found.sort()
@@ -101,14 +142,16 @@ class DynamicScraper:
                 date_str = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
         
         location_patterns = [
+            r'LG전자베스트샵\s*동광주점[^\n]{0,50}',
             r'컨벤션\s*타워[^\n]{0,50}',
             r'신세계백화점[^\n]{0,50}',
             r'킨텍스[^\n]{0,50}',
             r'세텍[^\n]{0,50}',
-            r'LG\s*전자[^\n]{0,50}',
             r'김대중[^\n]{0,50}',
             r'제이아트[^\n]{0,50}',
             r'염주[^\n]{0,50}',
+            r'광주여대[^\n]{0,80}',
+            r'더베스트웨딩\s*사옥[^\n]{0,50}',
             r'광주\s*[^\n]{10,80}',
         ]
         
@@ -120,6 +163,20 @@ class DynamicScraper:
         
         return date_str, location_str
     
+    def _get_wait_strategy(self, url: str, wait_selector: str = None) -> Dict[str, object]:
+        strategy = {
+            "wait_until": "domcontentloaded",
+            "selector": wait_selector or "body",
+            "post_wait_ms": 2000,
+        }
+        for domain, override in WAIT_STRATEGIES.items():
+            if domain in url:
+                strategy.update(override)
+                break
+        if wait_selector:
+            strategy["selector"] = wait_selector
+        return strategy
+
     def scrape_dynamic_page(self, url: str, wait_selector: str = None) -> Optional[str]:
         """동적 페이지 스크래핑"""
         if not PLAYWRIGHT_AVAILABLE:
@@ -128,6 +185,7 @@ class DynamicScraper:
         
         try:
             with sync_playwright() as p:
+                strategy = self._get_wait_strategy(url, wait_selector)
                 browser = p.chromium.launch(
                     headless=True,
                     args=['--no-sandbox', '--disable-dev-shm-usage']
@@ -140,13 +198,14 @@ class DynamicScraper:
                 
                 logger.info(f"📡 Playwright로 페이지 로드: {url}")
                 
-                page.goto(url, wait_until='networkidle', timeout=REQUEST_TIMEOUT * 1000)
+                page.goto(url, wait_until=strategy["wait_until"], timeout=REQUEST_TIMEOUT * 1000)
                 
-                if wait_selector:
-                    try:
-                        page.wait_for_selector(wait_selector, timeout=10000)
-                    except PlaywrightTimeout:
-                        logger.warning(f"⚠️ 선택자 '{wait_selector}' 대기 시간 초과")
+                try:
+                    page.wait_for_selector(str(strategy["selector"]), timeout=10000)
+                except PlaywrightTimeout:
+                    logger.warning(f"⚠️ 선택자 '{strategy['selector']}' 대기 시간 초과")
+
+                page.wait_for_timeout(int(strategy["post_wait_ms"]))
                 
                 html = page.content()
                 browser.close()
@@ -156,7 +215,7 @@ class DynamicScraper:
             logger.error(f"❌ 동적 페이지 스크래핑 실패: {e}")
             return None
     
-    def scrape_and_extract(self, url: str, wait_selector: str = None) -> Optional[List[Dict]]:
+    def scrape_and_extract(self, url: str, wait_selector: str = None, source_name: str = "dynamic_page", region: str = "광주") -> Optional[List[Dict]]:
         """동적 페이지 스크래핑 + 데이터 추출"""
         from bs4 import BeautifulSoup
         
@@ -171,17 +230,17 @@ class DynamicScraper:
         
         if '광주' in full_text and ('웨딩' in full_text or '박람회' in full_text):
             date_str, location_str = self._extract_date_and_location(full_text)
-            
-            results.append({
-                "name": "광주 웨딩박람회 (동적)",
-                "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
-                "end_date": date_str.split(' ~ ')[-1] if '~' in date_str else date_str,
-                "location": location_str,
-                "organizer": "",
-                "source_url": url,
-                "source": "dynamic_page",
-                "region": "광주"
-            })
+            if date_str:
+                results.append({
+                    "name": "광주 웨딩박람회 (동적)",
+                    "start_date": date_str.split(' ~ ')[0] if '~' in date_str else date_str,
+                    "end_date": date_str.split(' ~ ')[-1] if '~' in date_str else date_str,
+                    "location": location_str,
+                    "organizer": "",
+                    "source_url": url,
+                    "source": source_name,
+                    "region": region
+                })
         
         for h3 in soup.find_all('h3'):
             title = h3.get_text(strip=True)
@@ -196,8 +255,8 @@ class DynamicScraper:
                     "location": location_str,
                     "organizer": "",
                     "source_url": url,
-                    "source": "dynamic_page",
-                    "region": "광주"
+                    "source": source_name,
+                    "region": region
                 })
         
         logger.info(f"📊 동적 스크래핑: {len(results)}건 수집")
@@ -206,6 +265,7 @@ class DynamicScraper:
     def scrape_all(self) -> List[Dict]:
         """전체 동적 소스 스크래핑"""
         all_results = []
+        self.last_run_stats = {}
         
         for source in self.sources:
             url = source["url"]
@@ -213,24 +273,57 @@ class DynamicScraper:
             
             logger.info(f"📡 동적 스크래핑: {name}")
             
-            results = self.scrape_and_extract(url)
-
-            if results is None:
-                logger.info(f"🔁 {name} 재시도")
+            try:
+                results = self.scrape_and_extract(url, source_name=name, region=source.get("region", "광주"))
+            except TypeError:
                 results = self.scrape_and_extract(url)
 
             if results is None:
+                logger.info(f"🔁 {name} 재시도")
+                try:
+                    results = self.scrape_and_extract(url, source_name=name, region=source.get("region", "광주"))
+                except TypeError:
+                    results = self.scrape_and_extract(url)
+
+            if results is None:
                 logger.warning(f"⚠️ {name} 최종 실패")
+                self.last_run_stats[name] = {
+                    "success": False,
+                    "result_count": 0,
+                    "error": "fetch_failed",
+                    "url": url,
+                    "kind": "dynamic",
+                }
                 continue
 
             if results:
+                for item in results:
+                    item.setdefault("source", name)
+                    item.setdefault("region", source.get("region", "광주"))
                 all_results.extend(results)
                 logger.info(f"📊 {name}: {len(results)}건")
+                self.last_run_stats[name] = {
+                    "success": True,
+                    "result_count": len(results),
+                    "error": "",
+                    "url": url,
+                    "kind": "dynamic",
+                }
             else:
                 logger.info(f"ℹ️ {name}: 수집 결과 없음")
+                self.last_run_stats[name] = {
+                    "success": True,
+                    "result_count": 0,
+                    "error": "",
+                    "url": url,
+                    "kind": "dynamic",
+                }
         
         logger.info(f"\n✅ 동적 소스 총 {len(all_results)}건 수집")
         return all_results
+
+    def get_last_run_stats(self) -> Dict[str, Dict]:
+        return dict(self.last_run_stats)
     
     def scrape_with_fallback(self, url: str, regular_scraper_func) -> List[Dict]:
         """일반 스크래핑 실패 시 Playwright 폴백"""

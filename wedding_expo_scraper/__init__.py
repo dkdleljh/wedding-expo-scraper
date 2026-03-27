@@ -4,7 +4,7 @@
 광주광역시 웨딩박람회 자동 스크래핑 프로그램
 """
 
-__version__ = "1.0.0"
+__version__ = "4.0.0"
 __author__ = "Wedding Expo Scraper"
 
 from .config import SCRAPING_SOURCES, DATA_DIR, CSV_FILENAME

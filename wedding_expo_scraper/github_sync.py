@@ -13,7 +13,7 @@ from typing import Optional
 from git import Repo
 from git.exc import GitCommandError
 
-from .config import PROJECT_ROOT, GITHUB_TOKEN, GITHUB_REPO_URL, CSV_PATH
+from .config import PROJECT_ROOT, GITHUB_TOKEN, GITHUB_REPO_URL, CSV_PATH, DB_PATH
 
 
 logger = logging.getLogger(__name__)
@@ -116,16 +116,35 @@ class GitHubSync:
             logger.error(f"변경 요약 실패: {e}")
             return "알 수 없음"
     
-    def add_all(self) -> bool:
-        """모든 변경 사항 스테이징"""
+    def add_paths(self, paths: list[Path | str]) -> bool:
+        """지정한 경로만 스테이징"""
         try:
             repo = self._get_repo()
-            repo.git.add(A=True)
-            logger.info("✅ 모든 파일 스테이징 완료")
+            normalized = []
+            for path in paths:
+                path_obj = Path(path)
+                if not path_obj.is_absolute():
+                    path_obj = (self.repo_path / path_obj).resolve()
+                try:
+                    rel_path = path_obj.relative_to(self.repo_path)
+                except ValueError:
+                    continue
+                normalized.append(str(rel_path))
+
+            if not normalized:
+                logger.info("스테이징할 경로가 없습니다.")
+                return False
+
+            repo.git.add(*normalized)
+            logger.info("✅ 지정 경로 스테이징 완료: %s", ", ".join(normalized))
             return True
         except GitCommandError as e:
             logger.error(f"❌ 스테이징 실패: {e}")
             return False
+
+    def add_all(self) -> bool:
+        """운영 산출물 기본 스테이징"""
+        return self.add_paths([CSV_PATH, DB_PATH])
     
     def commit(self, message: Optional[str] = None) -> bool:
         """변경 사항 커밋"""

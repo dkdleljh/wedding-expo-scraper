@@ -16,6 +16,8 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 CSV_FILENAME = "gwangju_wedding_expos.csv"
 CSV_PATH = DATA_DIR / CSV_FILENAME
 DB_PATH = DATA_DIR / "wedding_expos.db"
+SOURCE_HEALTH_PATH = DATA_DIR / "source_health.json"
+SOURCE_HEALTH_REPORT_PATH = LOG_DIR / "latest_source_health_report.json"
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "")
@@ -25,6 +27,7 @@ TISTORY_CATEGORY_ID = os.getenv("TISTORY_CATEGORY_ID", "")
 TISTORY_TAGS = os.getenv("TISTORY_TAGS", "웨딩박람회,광주,주간업데이트")
 TISTORY_VISIBILITY = int(os.getenv("TISTORY_VISIBILITY", "3"))
 TISTORY_ACCEPT_COMMENT = int(os.getenv("TISTORY_ACCEPT_COMMENT", "1"))
+PRODUCTION_SOURCE_MODE = os.getenv("PRODUCTION_SOURCE_MODE", "true").lower() == "true"
 
 # ================================================================================
 # 정적 스크래핑 소스 (30개+)
@@ -110,6 +113,23 @@ DYNAMIC_SOURCES = [
     {"name": "전라도웨딩박람회-Dynamic", "url": "https://url.kr/p/weddingfair/region/?region=jeolla", "category": "전라도", "region": "광주", "priority": 2},
 ]
 
+PRODUCTION_STATIC_SOURCE_NAMES = {
+    "더베스트웨딩",
+    "광주웨딩페스타",
+    "웨딩다모아-전라도",
+    "Wedding Fair Schedule",
+    "한국웨딩연합회-전라도",
+    "웨딩모멘트-전라도",
+    "전라도웨딩박람회",
+}
+
+PRODUCTION_DYNAMIC_SOURCE_NAMES = {
+    "웨딩다모아-전라도-Dynamic",
+    "한국웨딩연합회-전라도-Dynamic",
+    "광주웨딩페스타-Dynamic",
+    "웨딩모멘트-전라도-Dynamic",
+}
+
 # ================================================================================
 # API 소스 (Open API)
 # ================================================================================
@@ -130,6 +150,9 @@ REQUEST_RETRY_COUNT = 3
 REQUEST_DELAY_MIN = 1
 REQUEST_DELAY_MAX = 3
 MAX_CONCURRENT_REQUESTS = 5
+SOURCE_FAILURE_THRESHOLD = int(os.getenv("SOURCE_FAILURE_THRESHOLD", "3"))
+SOURCE_COOLDOWN_HOURS = int(os.getenv("SOURCE_COOLDOWN_HOURS", "24"))
+SOURCE_ZERO_RESULT_THRESHOLD = int(os.getenv("SOURCE_ZERO_RESULT_THRESHOLD", "5"))
 
 USE_PLAYWRIGHT_FALLBACK = os.getenv("USE_PLAYWRIGHT_FALLBACK", "true").lower() == "true"
 PLAYWRIGHT_WAIT_TIME = 5000
@@ -139,7 +162,7 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 CSV_COLUMNS = [
     "name", "start_date", "end_date", "operating_hours",
     "location", "organizer", "contact",
-    "source_url", "description"
+    "source_url", "description", "region", "source"
 ]
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -155,8 +178,26 @@ def ensure_directories():
 def get_all_sources():
     return SCRAPING_SOURCES + DYNAMIC_SOURCES + API_SOURCES
 
+def get_static_sources(region_filter: tuple[str, ...] = ("광주", "전국")):
+    return [s for s in SCRAPING_SOURCES if s.get("region") in region_filter]
+
+def get_dynamic_sources(region_filter: tuple[str, ...] = ("광주", "전국")):
+    return [s for s in DYNAMIC_SOURCES if s.get("region") in region_filter]
+
+def get_api_sources(region_filter: tuple[str, ...] = ("광주", "전국")):
+    return [s for s in API_SOURCES if s.get("region") in region_filter]
+
 def get_gwangju_sources():
-    return [s for s in get_all_sources() if s.get("region") in ["광주", "전국"]]
+    return get_static_sources() + get_dynamic_sources() + get_api_sources()
+
+def get_production_static_sources():
+    sources = get_static_sources()
+    return [source for source in sources if source["name"] in PRODUCTION_STATIC_SOURCE_NAMES]
+
+def get_production_dynamic_sources():
+    sources = get_dynamic_sources()
+    return [source for source in sources if source["name"] in PRODUCTION_DYNAMIC_SOURCE_NAMES]
 
 def get_priority_sources():
-    return sorted(get_gwangju_sources(), key=lambda x: x.get("priority", 99))
+    sources = get_production_static_sources() if PRODUCTION_SOURCE_MODE else get_static_sources()
+    return sorted(sources, key=lambda x: x.get("priority", 99))

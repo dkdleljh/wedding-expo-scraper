@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
+import json
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -20,14 +21,42 @@ def load_data():
     csv_path = Path(__file__).parent / "data" / "gwangju_wedding_expos.csv"
     if csv_path.exists():
         df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        if 'region' not in df.columns:
+            df['region'] = '광주'
+        if 'source' not in df.columns:
+            df['source'] = ''
         df['start_date'] = pd.to_datetime(df['start_date'], errors='coerce')
         df['end_date'] = pd.to_datetime(df['end_date'], errors='coerce')
         return df
     return pd.DataFrame()
 
+
+@st.cache_data
+def load_source_health():
+    report_path = Path(__file__).parent / "data" / "logs" / "latest_source_health_report.json"
+    state_path = Path(__file__).parent / "data" / "source_health.json"
+
+    report = {}
+    state = {}
+
+    if report_path.exists():
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except Exception:
+            report = {}
+
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except Exception:
+            state = {}
+
+    return report, state
+
 st.title("🌸 광주광역시 웨딩박람회 대시보드")
 
 df = load_data()
+health_report, health_state = load_source_health()
 
 if df.empty:
     st.warning("데이터가 없습니다. 스크래핑을 실행해주세요.")
@@ -56,11 +85,12 @@ st.divider()
 col_filter1, col_filter2, col_filter3 = st.columns(3)
 
 with col_filter1:
+    today_date = today.date()
     date_range = st.date_input(
         "📅 날짜 범위",
-        value=(today, today + timedelta(days=30)),
-        min_value=today - timedelta(days=365),
-        max_value=today + timedelta(days=365)
+        value=(today_date, (today + timedelta(days=30)).date()),
+        min_value=(today - timedelta(days=365)).date(),
+        max_value=(today + timedelta(days=365)).date()
     )
 
 with col_filter2:
@@ -85,7 +115,7 @@ if search:
 if selected_region != "전체":
     filtered_df = filtered_df[filtered_df['region'] == selected_region]
 
-tab1, tab2, tab3, tab4 = st.tabs(["📋 전체 일정", "📊 통계", "📅 캘린더", "📥 내보내기"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 전체 일정", "📊 통계", "📅 캘린더", "📥 내보내기", "🩺 소스 상태"])
 
 with tab1:
     st.subheader(f"전체 일정 ({len(filtered_df)}건)")
@@ -115,8 +145,9 @@ with tab2:
     
     with col_chart1:
         st.write("**월별 분포**")
-        df['month'] = df['start_date'].dt.month
-        monthly = df.groupby('month').size().reset_index(name='count')
+        chart_df = df.copy()
+        chart_df['month'] = chart_df['start_date'].dt.month
+        monthly = chart_df.groupby('month').size().reset_index(name='count')
         fig = px.bar(monthly, x='month', y='count', color='count', color_continuous_scale='Blues')
         fig.update_layout(xaxis_title="월", yaxis_title="개수", showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
@@ -170,6 +201,59 @@ with tab4:
         md_lines.append(f"| {name} | {start} | {end} | {loc} |")
     
     st.code("\n".join(md_lines), language="markdown")
+
+with tab5:
+    st.subheader("🩺 소스 헬스 상태")
+
+    if not health_state:
+        st.info("헬스 상태 데이터가 없습니다. 스크래퍼를 한 번 실행해 주세요.")
+    else:
+        rows = []
+        for source_name, state in sorted(health_state.items()):
+            rows.append({
+                "소스": source_name,
+                "상태": state.get("status", ""),
+                "연속 실패": state.get("consecutive_failures", 0),
+                "연속 0건": state.get("consecutive_zero_results", 0),
+                "마지막 결과": state.get("last_result_count", 0),
+                "마지막 성공": state.get("last_success_at", ""),
+                "마지막 실패": state.get("last_failed_at", ""),
+                "마지막 점검": state.get("last_checked_at", ""),
+            })
+
+        health_df = pd.DataFrame(rows)
+
+        col_h1, col_h2, col_h3 = st.columns(3)
+        with col_h1:
+            st.metric("추적 소스", len(health_df))
+        with col_h2:
+            st.metric("실패 상태", int((health_df["상태"] == "failing").sum()))
+        with col_h3:
+            quarantined = int(
+                ((health_df["연속 실패"] >= 3) | (health_df["연속 0건"] >= 5)).sum()
+            )
+            st.metric("격리 후보", quarantined)
+
+        st.dataframe(health_df, use_container_width=True, hide_index=True)
+
+        skipped = health_report.get("skipped_sources", [])
+        if skipped:
+            st.write("**이번 실행에서 제외된 소스**")
+            skipped_df = pd.DataFrame(skipped)
+            st.dataframe(skipped_df, use_container_width=True, hide_index=True)
+
+        if health_report.get("sources"):
+            report_rows = []
+            for source_name, stats in sorted(health_report["sources"].items()):
+                report_rows.append({
+                    "소스": source_name,
+                    "종류": stats.get("kind", ""),
+                    "성공": stats.get("success", False),
+                    "결과 수": stats.get("result_count", 0),
+                    "오류": stats.get("error", ""),
+                })
+            st.write("**최근 실행 요약**")
+            st.dataframe(pd.DataFrame(report_rows), use_container_width=True, hide_index=True)
 
 st.sidebar.header("ℹ️ 시스템 정보")
 st.sidebar.success(f"**총 데이터**: {len(df)}건")
