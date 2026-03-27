@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import main as main_module
 
 from main import main as run_main
+from wedding_expo_scraper.config import CRITICAL_SOURCE_NAMES
 from wedding_expo_scraper.source_health import SourceHealthManager
 
 
@@ -100,8 +101,39 @@ def test_main_dry_run_skips_side_effects(monkeypatch, tmp_path):
     monkeypatch.setattr(main_module, "DataStorage", FakeStorage)
     monkeypatch.setattr(main_module, "get_priority_sources", lambda: [{"name": "테스트", "url": "https://example.com"}])
     monkeypatch.setattr(main_module, "get_production_dynamic_sources", lambda: [])
-    monkeypatch.setattr(main_module, "SourceHealthManager", lambda: SourceHealthManager(health_path=tmp_path / "health.json"))
+    monkeypatch.setattr(
+        main_module,
+        "SourceHealthManager",
+        lambda: SourceHealthManager(
+            health_path=tmp_path / "health.json",
+            report_path=tmp_path / "report.json",
+        ),
+    )
 
     exit_code = run_main(["--dry-run"])
     assert exit_code == 0
     assert save_called["value"] is False
+    report = (tmp_path / "report.json").read_text(encoding="utf-8")
+    assert '"final_valid_count": 1' in report
+
+
+def test_source_health_report_tracks_critical_zero_results(tmp_path):
+    manager = SourceHealthManager(
+        health_path=tmp_path / "health.json",
+        report_path=tmp_path / "report.json",
+    )
+    run_stats = {
+        "더베스트웨딩": {"success": True, "result_count": 0, "error": ""},
+        "광주웨딩페스타": {"success": True, "result_count": 0, "error": ""},
+        "광주웨딩페스타-Dynamic": {"success": True, "result_count": 0, "error": ""},
+        "웨딩모멘트-전라도": {"success": True, "result_count": 5, "error": ""},
+    }
+
+    report = manager.build_report(
+        run_stats,
+        skipped_sources=[],
+        summary={"raw_count": 5, "parsed_count": 3, "final_valid_count": 2},
+    )
+
+    assert report["final_valid_count"] == 2
+    assert set(report["critical_zero_result_sources"]) == CRITICAL_SOURCE_NAMES

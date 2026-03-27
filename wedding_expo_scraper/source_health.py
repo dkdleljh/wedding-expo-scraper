@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from .config import (
+    CRITICAL_SOURCE_NAMES,
     SOURCE_COOLDOWN_HOURS,
     SOURCE_FAILURE_THRESHOLD,
     SOURCE_HEALTH_PATH,
@@ -32,11 +33,13 @@ class SourceHealthManager:
     def __init__(
         self,
         health_path: Path = SOURCE_HEALTH_PATH,
+        report_path: Path = SOURCE_HEALTH_REPORT_PATH,
         failure_threshold: int = SOURCE_FAILURE_THRESHOLD,
         cooldown_hours: int = SOURCE_COOLDOWN_HOURS,
         zero_result_threshold: int = SOURCE_ZERO_RESULT_THRESHOLD,
     ):
         self.health_path = health_path
+        self.report_path = report_path
         self.failure_threshold = failure_threshold
         self.cooldown_hours = cooldown_hours
         self.zero_result_threshold = zero_result_threshold
@@ -53,6 +56,9 @@ class SourceHealthManager:
 
     def save(self) -> None:
         self.health_path.parent.mkdir(parents=True, exist_ok=True)
+        for health in self.state.values():
+            health.setdefault("consecutive_failures", 0)
+            health.setdefault("consecutive_zero_results", 0)
         self.health_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _health_key(self, source: Dict) -> str:
@@ -130,11 +136,25 @@ class SourceHealthManager:
                 health["consecutive_failures"] = int(health.get("consecutive_failures", 0)) + 1
                 health["last_failed_at"] = timestamp
 
-    def build_report(self, run_stats: Dict[str, Dict], skipped_sources: List[Dict]) -> Dict[str, object]:
-        return {
+    def build_report(
+        self,
+        run_stats: Dict[str, Dict],
+        skipped_sources: List[Dict],
+        summary: Dict[str, int] | None = None,
+    ) -> Dict[str, object]:
+        zero_result_sources = [
+            source_name
+            for source_name, stats in run_stats.items()
+            if stats.get("success") and int(stats.get("result_count", 0)) == 0
+        ]
+        report = {
             "checked_sources": len(run_stats),
             "healthy_sources": sum(1 for stats in run_stats.values() if stats.get("success")),
             "failed_sources": sum(1 for stats in run_stats.values() if not stats.get("success")),
+            "zero_result_sources": zero_result_sources,
+            "critical_zero_result_sources": [
+                source_name for source_name in zero_result_sources if source_name in CRITICAL_SOURCE_NAMES
+            ],
             "skipped_sources": [
                 {"name": source.get("name", ""), "reason": source.get("skip_reason", "")}
                 for source in skipped_sources
@@ -142,7 +162,11 @@ class SourceHealthManager:
             "sources": run_stats,
             "state": self.state,
         }
+        if summary:
+            report.update(summary)
+        return report
 
-    def save_report(self, report: Dict[str, object], report_path: Path = SOURCE_HEALTH_REPORT_PATH) -> None:
+    def save_report(self, report: Dict[str, object], report_path: Path | None = None) -> None:
+        report_path = report_path or self.report_path
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -13,7 +13,16 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from wedding_expo_scraper.config import ensure_directories, LOG_DIR, LOG_FORMAT, LOG_DATE_FORMAT, get_priority_sources, get_dynamic_sources, get_production_dynamic_sources, PRODUCTION_SOURCE_MODE
+from wedding_expo_scraper.config import (
+    ensure_directories,
+    LOG_DIR,
+    LOG_FORMAT,
+    LOG_DATE_FORMAT,
+    get_priority_sources,
+    get_dynamic_sources,
+    get_production_dynamic_sources,
+    PRODUCTION_SOURCE_MODE,
+)
 from wedding_expo_scraper.scraper import WeddingExpoScraper
 from wedding_expo_scraper.dynamic_scraper import DynamicScraper
 from wedding_expo_scraper.parser import ExpoParser
@@ -121,6 +130,16 @@ def main(argv=None):
             logger.warning("⚠️ 수집된 데이터가 없습니다.")
             health_manager.update_from_run_stats(run_stats)
             health_manager.save()
+            health_report = health_manager.build_report(
+                run_stats,
+                skipped_sources,
+                summary={
+                    "raw_count": 0,
+                    "parsed_count": 0,
+                    "final_valid_count": 0,
+                },
+            )
+            health_manager.save_report(health_report)
             return 0
         
         # 2. 정규화
@@ -136,7 +155,15 @@ def main(argv=None):
 
         health_manager.update_from_run_stats(run_stats)
         health_manager.save()
-        health_report = health_manager.build_report(run_stats, skipped_sources)
+        health_report = health_manager.build_report(
+            run_stats,
+            skipped_sources,
+            summary={
+                "raw_count": len(raw_data),
+                "parsed_count": len(parsed_data),
+                "final_valid_count": len(merged_data),
+            },
+        )
         health_manager.save_report(health_report)
         logger.info("       🩺 헬스 요약: %s", json.dumps(health_report, ensure_ascii=False))
         

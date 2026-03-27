@@ -29,6 +29,8 @@ report = json.loads(report_path.read_text(encoding="utf-8"))
 checked = int(report.get("checked_sources", 0))
 healthy = int(report.get("healthy_sources", 0))
 failed = int(report.get("failed_sources", 0))
+final_valid = int(report.get("final_valid_count", 0))
+critical_zero = list(report.get("critical_zero_result_sources", []))
 
 if checked == 0:
     print("precheck_failed: no checked sources")
@@ -42,7 +44,18 @@ if failed >= checked:
     print("precheck_failed: all checked sources failed")
     sys.exit(2)
 
-print(f"precheck_ok: checked={checked} healthy={healthy} failed={failed}")
+if final_valid == 0:
+    print("precheck_failed: no canonical expos after normalization")
+    sys.exit(2)
+
+if len(critical_zero) == 3:
+    print(f"precheck_failed: all critical direct sources returned zero results: {critical_zero}")
+    sys.exit(2)
+
+print(
+    f"precheck_ok: checked={checked} healthy={healthy} failed={failed} "
+    f"final_valid={final_valid} critical_zero={len(critical_zero)}"
+)
 PY
 
 echo "[run] $(date '+%Y-%m-%d %H:%M:%S')"
