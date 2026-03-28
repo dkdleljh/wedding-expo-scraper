@@ -1,106 +1,115 @@
 {
   "광주웨딩페스타": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 1,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0,
-    "last_zero_result_at": "2026-03-28T01:33:49.909692"
+    "last_zero_result_at": "2026-03-28T06:01:51.215068"
   },
   "웨딩다모아-전라도": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 0,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
-    "consecutive_zero_results": 2,
-    "last_zero_result_at": "2026-03-28T01:36:20.188520"
+    "last_success_at": "2026-03-28T14:18:03.828711",
+    "consecutive_zero_results": 5,
+    "last_zero_result_at": "2026-03-28T14:18:03.828711"
   },
   "한국웨딩연합회-전라도": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 0,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
-    "consecutive_zero_results": 2,
-    "last_zero_result_at": "2026-03-28T01:36:20.188520"
+    "last_success_at": "2026-03-28T14:18:03.828711",
+    "consecutive_zero_results": 5,
+    "last_zero_result_at": "2026-03-28T14:18:03.828711"
   },
   "웨딩모멘트-전라도": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 5,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   },
   "Wedding Fair Schedule": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 5,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   },
   "더베스트웨딩": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 3,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   },
   "전라도웨딩박람회": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 5,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   },
   "웨딩다모아-전라도-Dynamic": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 0,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
-    "consecutive_zero_results": 2,
-    "last_zero_result_at": "2026-03-28T01:36:20.188520"
+    "last_success_at": "2026-03-28T14:18:03.828711",
+    "consecutive_zero_results": 5,
+    "last_zero_result_at": "2026-03-28T14:18:03.828711"
   },
   "한국웨딩연합회-전라도-Dynamic": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 2,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   },
   "광주웨딩페스타-Dynamic": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 0,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
-    "consecutive_zero_results": 2,
-    "last_zero_result_at": "2026-03-28T01:36:20.188520"
+    "last_success_at": "2026-03-28T14:18:03.828711",
+    "consecutive_zero_results": 5,
+    "last_zero_result_at": "2026-03-28T14:18:03.828711"
   },
   "웨딩모멘트-전라도-Dynamic": {
-    "last_checked_at": "2026-03-28T01:36:20.188520",
+    "last_checked_at": "2026-03-28T14:18:03.828711",
     "last_result_count": 6,
     "last_error": "",
     "status": "healthy",
     "consecutive_failures": 0,
-    "last_success_at": "2026-03-28T01:36:20.188520",
+    "last_success_at": "2026-03-28T14:18:03.828711",
+    "consecutive_zero_results": 0
+  },
+  "웨딩고-광주": {
+    "last_checked_at": "2026-03-28T14:18:03.828711",
+    "last_result_count": 5,
+    "last_error": "",
+    "status": "healthy",
+    "consecutive_failures": 0,
+    "last_success_at": "2026-03-28T14:18:03.828711",
     "consecutive_zero_results": 0
   }
 }

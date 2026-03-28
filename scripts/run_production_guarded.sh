@@ -31,6 +31,8 @@ healthy = int(report.get("healthy_sources", 0))
 failed = int(report.get("failed_sources", 0))
 final_valid = int(report.get("final_valid_count", 0))
 critical_zero = list(report.get("critical_zero_result_sources", []))
+coverage_reference = int(report.get("coverage_reference_count", 0))
+coverage_missing = int(report.get("coverage_missing_count", 0))
 
 if checked == 0:
     print("precheck_failed: no checked sources")
@@ -48,13 +50,21 @@ if final_valid == 0:
     print("precheck_failed: no canonical expos after normalization")
     sys.exit(2)
 
+if coverage_reference == 0:
+    print("precheck_failed: no coverage reference records available")
+    sys.exit(2)
+
+if coverage_missing > 0:
+    print(f"precheck_failed: missing {coverage_missing} expos from coverage references")
+    sys.exit(2)
+
 if len(critical_zero) == 3:
     print(f"precheck_failed: all critical direct sources returned zero results: {critical_zero}")
     sys.exit(2)
 
 print(
     f"precheck_ok: checked={checked} healthy={healthy} failed={failed} "
-    f"final_valid={final_valid} critical_zero={len(critical_zero)}"
+    f"final_valid={final_valid} critical_zero={len(critical_zero)} coverage_missing={coverage_missing}"
 )
 PY
 

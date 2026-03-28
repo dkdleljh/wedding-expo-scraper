@@ -31,6 +31,7 @@ from wedding_expo_scraper.github_sync import GitHubSync
 from wedding_expo_scraper.notification import NotificationService
 from wedding_expo_scraper.tistory_post import TistoryPoster
 from wedding_expo_scraper.source_health import SourceHealthManager
+from wedding_expo_scraper.coverage_audit import CoverageAuditor
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -153,6 +154,10 @@ def main(argv=None):
             logger.info("       ⚠️ 신규 유효 데이터가 없어 기존 데이터 로드")
             merged_data = storage.get_all()
 
+        coverage_audit = CoverageAuditor().audit(merged_data)
+        if coverage_audit.get('coverage_missing_count', 0):
+            logger.warning("       ⚠️ 레퍼런스 대비 누락 행사 %s건: %s", coverage_audit['coverage_missing_count'], json.dumps(coverage_audit['coverage_missing_expos'], ensure_ascii=False))
+
         health_manager.update_from_run_stats(run_stats)
         health_manager.save()
         health_report = health_manager.build_report(
@@ -162,6 +167,7 @@ def main(argv=None):
                 "raw_count": len(raw_data),
                 "parsed_count": len(parsed_data),
                 "final_valid_count": len(merged_data),
+                **coverage_audit,
             },
         )
         health_manager.save_report(health_report)

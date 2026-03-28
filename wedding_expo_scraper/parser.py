@@ -131,6 +131,11 @@ class ExpoParser:
             'address': '광주 동구 서석로 13-1 3층',
             'description': '더베스트웨딩 운영 공간'
         },
+        '더베스트웨딩컴퍼니 사옥': {
+            'name': '더베스트웨딩 사옥',
+            'address': '광주 동구 서석로 13-1 3층',
+            'description': '더베스트웨딩 운영 공간'
+        },
     }
     
     def __init__(self):

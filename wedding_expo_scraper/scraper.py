@@ -204,6 +204,68 @@ class WeddingExpoScraper:
         
         return results
     
+    def _extract_weddingo(self, html: str, url: str, source_name: str, region: str) -> List[Dict]:
+        """weddingo.kr 광주 페이지 전용 파서"""
+        results = []
+        seen = set()
+        soup = BeautifulSoup(html, 'lxml')
+
+        for article in soup.select('article.item'):
+            try:
+                name_el = article.select_one('.item-name')
+                if not name_el:
+                    continue
+                title = name_el.get_text(strip=True)
+                if '광주' not in title:
+                    continue
+                if not any(keyword in title for keyword in ['웨딩', '박람회', '페스타', '페어', '엑스포']):
+                    continue
+
+                meta_rows = article.select('.item-meta-row')
+                date_text = ''
+                location = '광주광역시'
+                for row in meta_rows:
+                    row_text = row.get_text(' ', strip=True)
+                    if '날짜' in row_text:
+                        date_text = row.find_all('span')[-1].get_text(strip=True)
+                    elif '장소' in row_text:
+                        location_name = row.select_one('[itemprop="name"]')
+                        if location_name:
+                            location = location_name.get_text(strip=True)
+                        else:
+                            location = row.find_all('span')[-1].get_text(strip=True)
+
+                if not date_text or '날짜 미정' in date_text:
+                    continue
+
+                date_match = re.search(r'(\d{4})\.(\d{1,2})\.(\d{1,2})\s*~\s*(?:(\d{4})\.)?(\d{1,2})\.(\d{1,2})', date_text)
+                if not date_match:
+                    continue
+                start_year = int(date_match.group(1))
+                end_year = int(date_match.group(4) or start_year)
+                start_date = f"{start_year}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
+                end_date = f"{end_year}-{int(date_match.group(5)):02d}-{int(date_match.group(6)):02d}"
+
+                item_key = (title.strip().lower(), start_date, location.strip().lower())
+                if item_key in seen:
+                    continue
+                seen.add(item_key)
+
+                results.append({
+                    'name': title[:100],
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'location': location[:100],
+                    'organizer': '웨딩고',
+                    'source_url': url,
+                    'source': source_name,
+                    'region': region,
+                })
+            except Exception:
+                continue
+
+        return results
+
     def _extract_weddingdamoa(self, html: str, url: str, source_name: str, region: str) -> List[Dict]:
         """weddingdamoa.com 파서 - 정확한 날짜/장소 추출"""
         results = []
@@ -389,6 +451,8 @@ class WeddingExpoScraper:
             results = self._extract_weddingdamoa(html, url, source_name, region)
         elif 'keu.or.kr' in url.lower():
             results = self._extract_keu(html, url, source_name, region)
+        elif 'weddingo.kr' in url.lower():
+            results = self._extract_weddingo(html, url, source_name, region)
         else:
             results = self._extract_gwangju_expos(html, url, source_name, region)
         

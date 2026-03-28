@@ -64,6 +64,7 @@ SCRAPING_SOURCES = [
     # 4. 웨딩 포털 및 매거진 (5개)
     # ============================================================================
     {"name": "웨딩고", "url": "https://weddingo.kr/", "category": "웨딩 포털", "region": "전국", "priority": 1},
+    {"name": "웨딩고-광주", "url": "https://weddingo.kr/%EA%B4%91%EC%A3%BC", "category": "광주", "region": "광주", "priority": 1},
     {"name": "웨딩다이어리", "url": "https://www.weddingdiary.co.kr/", "category": "웨딩 포털", "region": "전국", "priority": 2},
     {"name": "웨딩박람회투어", "url": "https://www.weddingexpo.co.kr/", "category": "웨딩 포털", "region": "전국", "priority": 2},
     {"name": "웨딩SNS", "url": "https://weddingsns.com/", "category": "웨딩 포털", "region": "전국", "priority": 2},
@@ -116,6 +117,7 @@ DYNAMIC_SOURCES = [
 PRODUCTION_STATIC_SOURCE_NAMES = {
     "더베스트웨딩",
     "광주웨딩페스타",
+    "웨딩고-광주",
     "웨딩다모아-전라도",
     "Wedding Fair Schedule",
     "한국웨딩연합회-전라도",

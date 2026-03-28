@@ -101,6 +101,16 @@ def test_main_dry_run_skips_side_effects(monkeypatch, tmp_path):
     monkeypatch.setattr(main_module, "DataStorage", FakeStorage)
     monkeypatch.setattr(main_module, "get_priority_sources", lambda: [{"name": "테스트", "url": "https://example.com"}])
     monkeypatch.setattr(main_module, "get_production_dynamic_sources", lambda: [])
+    class FakeCoverageAuditor:
+        def audit(self, actual_records):
+            return {
+                "coverage_reference_count": 1,
+                "coverage_matched_count": 1,
+                "coverage_missing_count": 0,
+                "coverage_missing_expos": [],
+                "coverage_reference_sources": ["테스트-레퍼런스"],
+            }
+
     monkeypatch.setattr(
         main_module,
         "SourceHealthManager",
@@ -109,6 +119,7 @@ def test_main_dry_run_skips_side_effects(monkeypatch, tmp_path):
             report_path=tmp_path / "report.json",
         ),
     )
+    monkeypatch.setattr(main_module, "CoverageAuditor", FakeCoverageAuditor)
 
     exit_code = run_main(["--dry-run"])
     assert exit_code == 0
