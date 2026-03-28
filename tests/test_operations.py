@@ -148,3 +148,45 @@ def test_source_health_report_tracks_critical_zero_results(tmp_path):
 
     assert report["final_valid_count"] == 2
     assert set(report["critical_zero_result_sources"]) == CRITICAL_SOURCE_NAMES
+
+
+def test_storage_save_replaces_snapshot(tmp_path):
+    from wedding_expo_scraper.storage import DataStorage
+
+    storage = DataStorage(db_path=tmp_path / "test.db")
+    first = [
+        {
+            "name": "행사 A",
+            "start_date": "2026-03-28",
+            "end_date": "2026-03-29",
+            "operating_hours": "10:00~18:00",
+            "location": "염주종합체육관 (광주 서구 금화로 278)",
+            "organizer": "",
+            "contact": "",
+            "source_url": "https://a.example.com",
+            "description": "",
+            "region": "광주",
+            "source": "테스트",
+        },
+        {
+            "name": "행사 B",
+            "start_date": "2026-04-04",
+            "end_date": "2026-04-05",
+            "operating_hours": "10:00~18:00",
+            "location": "메리포엠웨딩홀(광주 광산구 무진대로 282)",
+            "organizer": "",
+            "contact": "",
+            "source_url": "https://b.example.com",
+            "description": "",
+            "region": "광주",
+            "source": "테스트",
+        },
+    ]
+    second = [first[1]]
+
+    assert storage.save(first) is True
+    assert len(storage.get_all()) == 2
+    assert storage.save(second) is True
+    rows = storage.get_all()
+    assert len(rows) == 1
+    assert rows[0]["name"] == "행사 B"

@@ -90,23 +90,15 @@ class DataStorage:
             return False
         
         try:
-            # 1. DB에 Insert (OR IGNORE로 중복 방지)
+            # 1. canonical 최종 결과를 스냅샷 방식으로 저장
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                cursor.execute('DELETE FROM wedding_expos')
                 for item in data:
                     cursor.execute('''
                         INSERT INTO wedding_expos 
                         (name, start_date, end_date, operating_hours, location, organizer, contact, source_url, description, region, source, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT(name, start_date, location, source_url) DO UPDATE SET
-                            end_date=excluded.end_date,
-                            operating_hours=excluded.operating_hours,
-                            organizer=excluded.organizer,
-                            contact=excluded.contact,
-                            description=excluded.description,
-                            region=excluded.region,
-                            source=excluded.source,
-                            updated_at=CURRENT_TIMESTAMP
                     ''', (
                         item.get('name'), item.get('start_date'), item.get('end_date'),
                         item.get('operating_hours'), item.get('location'), item.get('organizer'),

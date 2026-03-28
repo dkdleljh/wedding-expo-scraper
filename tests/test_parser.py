@@ -247,6 +247,59 @@ class TestExpoParser:
         result = parser.filter_valid_records(records)
         assert len(result) == 1
 
+    def test_filter_valid_records_prefers_weddingo_specific_location(self, parser):
+        today = datetime.now().date()
+        records = [
+            {
+                "name": "광주 메리포엠 웨딩페어",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "컨벤션타워 2층",
+                "organizer": "",
+                "contact": "",
+                "source_url": "https://weddingmoment.co.kr/jeolla",
+                "description": "",
+                "region": "광주",
+                "source": "웨딩모멘트-전라도",
+            },
+            {
+                "name": "광주 메리포엠 웨딩페어",
+                "start_date": today.strftime("%Y-%m-%d"),
+                "end_date": today.strftime("%Y-%m-%d"),
+                "location": "메리포엠웨딩홀(광주 광산구 무진대로 282)",
+                "organizer": "웨딩고",
+                "contact": "",
+                "source_url": "https://weddingo.kr/%EA%B4%91%EC%A3%BC",
+                "description": "",
+                "region": "광주",
+                "source": "웨딩고-광주",
+            },
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 1
+        assert "메리포엠웨딩홀" in result[0]["location"]
+        assert result[0]["source"] == "웨딩고-광주"
+
+    def test_filter_valid_records_keeps_ongoing_event(self, parser):
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+        tomorrow = today + timedelta(days=1)
+        records = [
+            {
+                "name": "광주 연합 웨딩박람회",
+                "start_date": yesterday.strftime("%Y-%m-%d"),
+                "end_date": tomorrow.strftime("%Y-%m-%d"),
+                "location": "염주",
+                "organizer": "",
+                "source_url": "https://example.com/ongoing",
+            }
+        ]
+
+        result = parser.filter_valid_records(records)
+        assert len(result) == 1
+        assert "염주종합체육관" in result[0]["location"]
+
 
 class TestConfig:
     def test_get_all_sources_count(self):

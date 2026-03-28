@@ -20,6 +20,7 @@ class ExpoParser:
     SOURCE_PREFERENCE = {
         '더베스트웨딩': 100,
         '광주웨딩페스타': 95,
+        '웨딩고-광주': 92,
         '한국웨딩연합회-전라도-Dynamic': 90,
         '한국웨딩연합회-전라도': 85,
         '웨딩모멘트-전라도-Dynamic': 80,
@@ -269,6 +270,13 @@ class ExpoParser:
             (item.get("location") or "").strip().lower(),
         )
 
+    def _event_identity_key(self, item: Dict) -> tuple:
+        return (
+            self._canonicalize_name(item.get("name", "")),
+            (item.get("start_date") or "").strip(),
+            (item.get("end_date") or "").strip(),
+        )
+
     def _record_quality(self, item: Dict) -> tuple:
         source = (item.get("source") or "").strip()
         filled_fields = sum(
@@ -277,7 +285,8 @@ class ExpoParser:
         )
         precise_location = 1 if self._is_precise_gwangju_location(item.get("location", "")) else 0
         source_pref = self.SOURCE_PREFERENCE.get(source, 0)
-        return (source_pref, filled_fields, precise_location, len(str(item.get("description", ""))))
+        location_length = len(str(item.get("location", "")))
+        return (source_pref, precise_location, location_length, filled_fields, len(str(item.get("description", ""))))
 
     def _merge_record_pair(self, preferred: Dict, candidate: Dict) -> Dict:
         merged = dict(preferred)
@@ -347,30 +356,40 @@ class ExpoParser:
         today = datetime.now().date()
         cutoff = self._add_months(today, self.TARGET_WINDOW_MONTHS)
         canonical_records: Dict[tuple, Dict] = {}
+        identity_records: Dict[tuple, Dict] = {}
 
         for item in records:
             try:
                 start_dt = datetime.strptime(item['start_date'], '%Y-%m-%d').date()
-                if start_dt < today or start_dt > cutoff:
+                end_dt = datetime.strptime(item.get('end_date', item['start_date']), '%Y-%m-%d').date()
+                if end_dt < today or start_dt > cutoff:
                     continue
                 normalized_item = dict(item)
                 normalized_item['location'] = self._normalize_location(item.get('location', ''))
                 if not self._is_precise_gwangju_location(normalized_item.get('location', '')):
                     continue
-                
-                key = self._canonical_record_key(normalized_item)
-                current = canonical_records.get(key)
-                if current is None:
-                    canonical_records[key] = normalized_item
-                    continue
 
-                if self._record_quality(normalized_item) > self._record_quality(current):
-                    canonical_records[key] = self._merge_record_pair(normalized_item, current)
+                strict_key = self._canonical_record_key(normalized_item)
+                current = canonical_records.get(strict_key)
+                if current is None:
+                    canonical_records[strict_key] = normalized_item
+                elif self._record_quality(normalized_item) > self._record_quality(current):
+                    canonical_records[strict_key] = self._merge_record_pair(normalized_item, current)
                 else:
-                    canonical_records[key] = self._merge_record_pair(current, normalized_item)
+                    canonical_records[strict_key] = self._merge_record_pair(current, normalized_item)
             except Exception:
                 continue
 
-        filtered = list(canonical_records.values())
+        for normalized_item in canonical_records.values():
+            identity_key = self._event_identity_key(normalized_item)
+            current = identity_records.get(identity_key)
+            if current is None:
+                identity_records[identity_key] = normalized_item
+            elif self._record_quality(normalized_item) > self._record_quality(current):
+                identity_records[identity_key] = self._merge_record_pair(normalized_item, current)
+            else:
+                identity_records[identity_key] = self._merge_record_pair(current, normalized_item)
+
+        filtered = list(identity_records.values())
         filtered.sort(key=lambda x: (x['start_date'], x['name']))
         return filtered
