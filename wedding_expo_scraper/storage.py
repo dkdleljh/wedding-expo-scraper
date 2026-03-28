@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 
 class DataStorage:
     """SQLite + CSV 기반 저장소"""
-    
-    def __init__(self, db_path: Optional[Path] = None):
+
+    def __init__(self, db_path: Optional[Path] = None, csv_path: Optional[Path] = None):
         self.db_path = db_path or DB_PATH
-        self.csv_path = CSV_PATH
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self.csv_path = csv_path or CSV_PATH
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.csv_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self):

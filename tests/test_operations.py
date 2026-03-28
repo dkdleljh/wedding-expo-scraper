@@ -153,7 +153,7 @@ def test_source_health_report_tracks_critical_zero_results(tmp_path):
 def test_storage_save_replaces_snapshot(tmp_path):
     from wedding_expo_scraper.storage import DataStorage
 
-    storage = DataStorage(db_path=tmp_path / "test.db")
+    storage = DataStorage(db_path=tmp_path / "test.db", csv_path=tmp_path / "test.csv")
     first = [
         {
             "name": "행사 A",
